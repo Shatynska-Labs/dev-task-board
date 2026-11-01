@@ -30,7 +30,7 @@
 
 **Hook installation.** `prepare` runs `simple-git-hooks`, so `npm ci` in a checkout installs them, and every worktree is provisioned with `npm ci` as `AGENTS.md` says. Hooks live in the common Git directory, so they bind every worktree once installed. They call tools through `npm exec --no`, so a checkout not provisioned fails rather than downloading, which is `No stand-down` as decided. Until this merges the main checkout has no `package.json` and its commits fail those hooks; nothing is committed there meanwhile, and it is provisioned after the merge.
 
-**What Biome and Vitest leave out.** Biome also excludes `dist/` and `coverage/`, and Vitest extends `configDefaults.exclude` rather than replacing it.
+**What Biome and Vitest leave out.** Biome also excludes `dist/` and `coverage/`, and markdown, since it would reformat `AGENTS.md`'s managed block and this project's prose. `AGENTS.md`'s formatting item therefore covers code and configuration. Vitest extends `configDefaults.exclude` rather than replacing it.
 
 ## Risks / Trade-offs
 
@@ -44,4 +44,4 @@ Merge, then the operator publishes once from a clean `main` and sets the trusted
 
 ## Open Questions
 
-None.
+- The licence. The operator has not chosen one, so `package.json` names none, and they settle it before the first publish.

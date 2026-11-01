@@ -3,31 +3,21 @@ import {
 	cpSync,
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readFileSync,
-	realpathSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	removeTemporaryDirectories,
+	temporaryDirectory,
+} from "./support/temporary.js";
 
 vi.setConfig({ testTimeout: 30_000 });
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const builtCommand = join(repositoryRoot, "dist", "cli.js");
-
-const temporaryDirectories: string[] = [];
-
-function temporaryDirectory(): string {
-	const directory = realpathSync(
-		mkdtempSync(join(tmpdir(), "dev-task-board-cli-")),
-	);
-	temporaryDirectories.push(directory);
-	return directory;
-}
 
 function runCommand(script: string, args: string[], cwd: string) {
 	return spawnSync(process.execPath, [script, ...args], {
@@ -36,11 +26,7 @@ function runCommand(script: string, args: string[], cwd: string) {
 	});
 }
 
-afterEach(() => {
-	for (const directory of temporaryDirectories.splice(0)) {
-		rmSync(directory, { recursive: true, force: true });
-	}
-});
+afterEach(removeTemporaryDirectories);
 
 describe("The command reports its version", () => {
 	describe("Asked for its version", () => {

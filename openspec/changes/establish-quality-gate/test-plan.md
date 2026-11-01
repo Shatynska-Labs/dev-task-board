@@ -105,3 +105,12 @@ The dispatch named `tests/support/`; the directory does not exist, so it holds n
 | `repositoryRoot` | all four test files | The repository's root, from the test file's own location | every test in those files | none | no | `tests/support/`, or keep local: one line |
 
 If the isolation builder is promoted, move `tests/carried-tool.test.ts -t "Fixtures are isolated"` onto it unchanged in what it asserts: it then holds the shared builder, which is what `tasks.md` 1.4's verification reaches for.
+
+## Dispositions at apply
+
+Written at `apply`, against the table above, and replacing what this file said before the runner existed: `tests/support/` now exists, and Vitest ran. `npm test` passes 36 tests and `npm run check:package` 17.
+
+- `isolatedEnvironment`, `git`, `buildFixtureRepository`: promoted to `tests/support/fixture.ts`.
+- `temporaryDirectory`: promoted to `tests/support/temporary.ts`, with its cleanup.
+- `stubNpm`, `reports`, `failsWith`: kept local, since no later change needs them yet.
+- `repositoryRoot`: kept local, being one line.

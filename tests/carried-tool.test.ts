@@ -1,6 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,21 +8,15 @@ import {
 	git,
 	isolatedEnvironment,
 } from "./support/fixture.js";
+import {
+	removeTemporaryDirectories,
+	temporaryDirectory,
+} from "./support/temporary.js";
 
 vi.setConfig({ testTimeout: 30_000 });
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const carriedTool = join(repositoryRoot, "vendor", "task-board");
-
-const temporaryDirectories: string[] = [];
-
-function temporaryDirectory(): string {
-	const directory = realpathSync(
-		mkdtempSync(join(tmpdir(), "dev-task-board-tool-")),
-	);
-	temporaryDirectories.push(directory);
-	return directory;
-}
 
 function runCarriedTool(fixture: string, cwd: string, env: NodeJS.ProcessEnv) {
 	return spawnSync("bash", [carriedTool, "--json", fixture], {
@@ -39,9 +32,7 @@ function holdsFullCommit(text: string): boolean {
 
 afterEach(() => {
 	vi.unstubAllEnvs();
-	for (const directory of temporaryDirectories.splice(0)) {
-		rmSync(directory, { recursive: true, force: true });
-	}
+	removeTemporaryDirectories();
 });
 
 describe("The carried tool works and names its source", () => {
