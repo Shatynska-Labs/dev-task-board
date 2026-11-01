@@ -6,7 +6,7 @@ const args = process.argv.slice(2);
 
 if (args.length === 1 && args[0] === "--version") {
 	const { version } = JSON.parse(readFileSync(packageFile, "utf8"));
-	console.log(`v${version}`);
+	console.log(version);
 } else {
 	console.error("usage: dev-task-board --version");
 	process.exitCode = 1;
