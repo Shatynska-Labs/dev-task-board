@@ -438,7 +438,9 @@ describe("A project's page shows its document", () => {
 				],
 			});
 
-			expectInOrder(textOf(page(document)), [
+			// After the first section, whose rows name their workstream.
+			const text = textOf(page(document));
+			expectInOrder(text.slice(text.indexOf("Active workstreams")), [
 				"active-and-idle",
 				"inactive-with-work",
 			]);

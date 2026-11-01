@@ -1,5 +1,6 @@
 import type { ProjectState, Reads } from "./reads.js";
 import type { Workspace } from "./settings.js";
+import { STYLE } from "./style.js";
 
 type Task = {
 	name: string;
@@ -13,6 +14,9 @@ type Task = {
 	priority?: string | null;
 	body?: string | null;
 	merge_unchecked?: boolean;
+	parts?: string[];
+	waits_on?: string[];
+	warnings?: string[];
 };
 
 type Step = { name: string; description?: string | null };
@@ -24,25 +28,17 @@ type Stream = {
 	done_when?: string | null;
 	active: boolean;
 	steps: Step[];
+	warnings?: string[];
 };
 
 type BoardDocument = {
 	project?: string;
 	written_at?: string;
 	forge?: string;
+	trunk?: { ref: string; commit: string };
 	workstreams?: Stream[];
 	tasks?: Task[];
 };
-
-const STYLE = `
-:root { color-scheme: light dark; --line: #8884; --muted: #777; }
-body { font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1rem; }
-h1 { font-size: 1.4rem; } h2 { font-size: 1.05rem; margin-top: 2rem; }
-ul { list-style: none; padding: 0; } li { padding: .35rem 0; border-top: 1px solid var(--line); }
-details { border-top: 1px solid var(--line); padding: .35rem 0; } summary { cursor: pointer; }
-.meta, .status { color: var(--muted); font-size: .9em; } .notice { color: #b35900; }
-pre { white-space: pre-wrap; }
-`;
 
 function escapeHtml(text: unknown): string {
 	return String(text)
@@ -57,6 +53,8 @@ function href(...names: string[]): string {
 	return escapeHtml(`/${names.map(encodeURIComponent).join("/")}`);
 }
 
+const STAGES = ["plan", "build", "ship"];
+
 function layout(title: string, body: string): string {
 	return `<!doctype html>
 <html lang="en">
@@ -66,132 +64,275 @@ function layout(title: string, body: string): string {
 <title>${escapeHtml(title)}</title>
 <style>${STYLE}</style>
 </head>
-<body>
+<body><main>
 ${body}
-</body>
+</main></body>
 </html>
 `;
 }
 
+function inline(text: unknown): string {
+	return escapeHtml(text)
+		.replace(/`([^`]+)`/g, "<code>$1</code>")
+		.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
 function forgeNotice(document: BoardDocument): string {
-	return document.forge === "full"
-		? ""
-		: `<span class="notice">The forge read was ${escapeHtml(document.forge)}: statuses may be wrong.</span>`;
+	return `The forge read was ${escapeHtml(document.forge)}: statuses may be wrong.`;
 }
 
-function details(summary: string, body: string): string {
-	return `<details><summary>${summary}</summary>${body}</details>`;
+function isPartial(document: BoardDocument): boolean {
+	return document.forge !== "full";
 }
 
-function taskLine(task: Task, words: string[] = []): string {
-	const shown = [
-		task.status,
-		task.stage,
-		task.priority,
-		task.closed_workstream && `from ${task.closed_workstream}`,
-		task.merge_unchecked && "merge unchecked",
-		task.last_commit &&
-			new Date(task.last_commit * 1000).toISOString().slice(0, 10),
-		...words,
-	].filter(Boolean);
-	const line = `${escapeHtml(task.name)} <span class="status">${escapeHtml(shown.join(" · "))}</span>`;
-	const summary = task.summary ? ` ${escapeHtml(task.summary)}` : "";
+function timeOf(stamp: string | undefined): number {
+	return stamp === undefined ? Number.NaN : Date.parse(stamp) / 1000;
+}
+
+function age(task: Task, now: number): string {
+	if (!task.last_commit || Number.isNaN(now)) {
+		return "";
+	}
+	const seconds = now - task.last_commit;
+	if (seconds < 3600) {
+		return `${Math.max(Math.floor(seconds / 60), 1)} min`;
+	}
+	return seconds < 86400
+		? `${Math.floor(seconds / 3600)} h`
+		: `${Math.floor(seconds / 86400)} d`;
+}
+
+function statusClass(status: string): string {
+	if (status === "in_flight") {
+		return "flight";
+	}
+	return status === "done" || status === "planned" ? status : "";
+}
+
+function statusLabel(status: string): string {
+	return status === "in_flight" ? "in flight" : status;
+}
+
+function statusMark(status: string): string {
+	return `<span class="st ${statusClass(status)}">${escapeHtml(statusLabel(status))}</span>`;
+}
+
+function warnings(texts: string[] | undefined): string {
+	return (texts ?? [])
+		.map((text) => `<p class="warning">${escapeHtml(text)}</p>`)
+		.join("");
+}
+
+function taskNotes(task: Task, description?: string | null): string {
+	return [
+		description,
+		task.summary,
+		task.waits_on?.length ? `Waits on ${task.waits_on.join(", ")}` : null,
+		task.closed_workstream
+			? `Names ${task.closed_workstream}, which is not open`
+			: null,
+	]
+		.filter(Boolean)
+		.map((text) => `<p class="desc">${inline(text)}</p>`)
+		.join("");
+}
+
+function taskBody(body: string): string {
+	return body
+		.split("\n")
+		.filter((line) => line.trim() !== "")
+		.map((line) => `<p class="full">${inline(line.replace(/^- /, ""))}</p>`)
+		.join("\n");
+}
+
+function taskRow(
+	task: Task,
+	now: number,
+	options: { description?: string | null; unplaced?: boolean } = {},
+): string {
+	const marks = [
+		task.stage && `<span class="stage-inline">${escapeHtml(task.stage)}</span>`,
+		task.priority && `<span class="tag">${escapeHtml(task.priority)}</span>`,
+		task.merge_unchecked && '<span class="mark">merge unchecked</span>',
+		options.unplaced && '<span class="mark">unplaced</span>',
+	]
+		.filter(Boolean)
+		.join("");
+	const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div><span class="ago">${age(task, now)}</span>`;
 	return task.body
-		? details(line + summary, `<pre>${escapeHtml(task.body)}</pre>`)
-		: line + summary;
+		? `<li class="step"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
+		: `<li class="step rowgrid">${line}<span></span></li>\n`;
 }
 
-function list(items: string[]): string {
-	return `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+const ROW_HEAD =
+	'<li class="rowgrid rowhead"><span>Status</span><span>Task</span><span>Last commit</span><span>Details</span></li>\n';
+
+function chevron(): string {
+	return '<span class="chev" aria-hidden="true">▶</span>';
 }
 
-function renderStream(stream: Stream, tasks: Task[]): string {
-	const steps = stream.steps.map((step) => {
-		const task = tasks.find((entry) => entry.name === step.name);
-		const line = task ? taskLine(task) : escapeHtml(step.name);
-		return step.description
-			? `${line} <span class="meta">${escapeHtml(step.description)}</span>`
-			: line;
-	});
+function progress(steps: Task[]): string {
+	const done = steps.filter((task) => task.status === "done").length;
+	const flying = steps.filter((task) => task.status === "in_flight").length;
+	const bar = steps
+		.map((task) => `<u class="${statusClass(task.status)}"></u>`)
+		.join("");
+	const words = `${done} of ${steps.length} done${flying > 0 ? `, ${flying} in work` : ""}`;
+	return `<div class="progress"><div class="bar">${bar}</div><span>${words}</span></div>`;
+}
+
+function renderStream(stream: Stream, tasks: Task[], now: number): string {
 	const stepNames = new Set(stream.steps.map((step) => step.name));
+	const rows = stream.steps.map((step) => {
+		const task = tasks.find((entry) => entry.name === step.name);
+		return task
+			? taskRow(task, now, { description: step.description })
+			: `<li class="step"><span class="name">${escapeHtml(step.name)}</span></li>\n`;
+	});
 	const unplaced = tasks
 		.filter(
 			(task) =>
 				!stepNames.has(task.name) && task.workstreams?.includes(stream.name),
 		)
-		.map((task) => taskLine(task, ["unplaced"]));
-	const about = [stream.summary, stream.goal, stream.done_when]
-		.filter(Boolean)
-		.map((text) => `<p class="meta">${escapeHtml(text)}</p>`)
-		.join("");
-	return details(
-		escapeHtml(stream.name),
-		about + list([...steps, ...unplaced]),
+		.map((task) => taskRow(task, now, { unplaced: true }));
+	const stepTasks = stream.steps.flatMap((step) =>
+		tasks.filter((task) => task.name === step.name),
 	);
+	const about = [
+		["Goal", stream.goal],
+		["Done when", stream.done_when],
+	]
+		.filter(([, text]) => text)
+		.map(
+			([title, text]) =>
+				`<p class="def"><strong>${title}:</strong> ${inline(text)}</p>`,
+		)
+		.join("\n");
+	const summary = stream.summary
+		? `<div class="sub">${inline(stream.summary)}</div>`
+		: "";
+	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}</div>${progress(stepTasks)}</summary>
+<div class="body">
+${about}${warnings(stream.warnings)}<ol class="steps">
+${ROW_HEAD}${[...rows, ...unplaced].join("")}</ol>
+</div></details>
+`;
+}
+
+function pipe(stage: string | null | undefined): string {
+	const at = STAGES.indexOf((stage ?? "").split(":")[0] ?? "");
+	return STAGES.map((_, index) => {
+		if (at === -1 || index > at) {
+			return "<i></i>";
+		}
+		return index === at ? '<i class="on"></i>' : '<i class="past"></i>';
+	}).join("");
+}
+
+function workRow(task: Task, now: number): string {
+	const tags = (task.parts ?? [])
+		.map(
+			(part) =>
+				`<span class="tag">${escapeHtml(part.replace("_", " ").replace(" pr", " PR"))}</span>`,
+		)
+		.join("");
+	const streams = task.workstreams ?? [];
+	const stream =
+		streams.length > 0
+			? `<div class="ws">${streams.map((name) => `<a href="#${escapeHtml(encodeURIComponent(name))}">${escapeHtml(name)}</a>`).join("")}</div>`
+			: '<div class="ws none">no workstream</div>';
+	return `<div class="work"><div><div class="name">${escapeHtml(task.name)}</div><div class="tags">${tags}</div></div><div><div class="pipe">${pipe(task.stage)}</div><span class="stage">${escapeHtml(task.stage ?? "")}</span></div><div class="ago">${age(task, now)}</div>${stream}</div>
+`;
 }
 
 function section(title: string, body: string): string {
-	return `<section><h2>${title}</h2>${body}</section>`;
+	return `<section><h2>${title}</h2>\n${body}</section>`;
 }
+
+const LEGEND =
+	'<div class="legend"><span class="st done">done</span><span class="st flight">in flight</span><span class="st">recorded</span><span class="st planned">planned</span></div>';
 
 function renderDocument(document: BoardDocument): string {
 	const tasks = document.tasks ?? [];
 	const streams = document.workstreams ?? [];
-	const inStream = new Set(streams.map((stream) => stream.name));
-	const inWork = tasks.filter((task) => task.status === "in_flight");
+	const now = timeOf(document.written_at);
+	const known = new Set(streams.map((stream) => stream.name));
+	const inWork = tasks
+		.filter((task) => task.status === "in_flight")
+		.sort((a, b) => (b.last_commit ?? 0) - (a.last_commit ?? 0));
 	const loose = tasks.filter(
-		(task) =>
-			task.status !== "in_flight" &&
-			!task.workstreams?.some((name) => inStream.has(name)),
+		(task) => !task.workstreams?.some((name) => known.has(name)),
 	);
 	const active = streams.filter((stream) => stream.active);
 	const other = streams.filter((stream) => !stream.active);
-	return [
-		inWork.length > 0
-			? section(
-					`In work (${inWork.length})`,
-					list(inWork.map((task) => taskLine(task))),
-				)
-			: "",
-		active.length > 0
-			? section(
-					`Active workstreams (${active.length})`,
-					active.map((stream) => renderStream(stream, tasks)).join(""),
-				)
-			: "",
-		other.length > 0
-			? section(
-					`Other workstreams (${other.length})`,
-					other.map((stream) => renderStream(stream, tasks)).join(""),
-				)
-			: "",
-		loose.length > 0
-			? section(
-					`Not in a workstream (${loose.length})`,
-					list(loose.map((task) => taskLine(task))),
-				)
-			: "",
-	].join("\n");
+	const groups = (list: Stream[]) =>
+		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
+	const parts: string[] = [];
+	if (inWork.length > 0) {
+		parts.push(
+			section(
+				`In work (${inWork.length})`,
+				`<div class="list"><div class="work workhead"><span>Task</span><span>Stage</span><span>Last commit</span><span>Workstream</span></div>\n${inWork.map((task) => workRow(task, now)).join("")}</div>\n<p class="meta">A session's own status report is finer than these stages.</p>`,
+			),
+		);
+	}
+	if (streams.length > 0) {
+		parts.push(
+			section(
+				`Active workstreams (${active.length})`,
+				`${active.length > 0 ? groups(active) : '<p class="meta">No workstream is active.</p>'}${LEGEND}`,
+			),
+		);
+	}
+	if (other.length > 0) {
+		parts.push(
+			section(
+				`Other workstreams (${other.length})`,
+				`<details class="group"><summary>${chevron()}<div><div class="name">${other.length} workstream${other.length === 1 ? "" : "s"}</div><div class="sub">Nothing in work right now</div></div><span></span></summary><div class="body">${groups(other)}</div></details>`,
+			),
+		);
+	}
+	if (loose.length > 0) {
+		parts.push(
+			section(
+				"Not in a workstream",
+				`<details class="group"${streams.length > 0 ? "" : " open"}><summary>${chevron()}<div><div class="name">${loose.length} task${loose.length === 1 ? "" : "s"}</div></div><span></span></summary><div class="body"><ul class="steps">\n${ROW_HEAD}${loose.map((task) => taskRow(task, now)).join("")}</ul></div></details>`,
+			),
+		);
+	}
+	return parts.join("\n");
 }
 
-function overviewRow(state: ProjectState | undefined): string {
+function counts(state: ProjectState | undefined): string {
 	if (state === undefined || state.state === "reading") {
-		return "being read";
+		return '<div class="counts">being read</div>';
 	}
 	if (state.state === "failed") {
-		return `failed: ${escapeHtml(state.reason)}`;
+		return `<div class="counts failed">failed: ${escapeHtml(state.reason)}</div>`;
 	}
 	const document = state.document as BoardDocument;
 	const tasks = document.tasks ?? [];
 	const inWork = tasks.filter((task) => task.status === "in_flight").length;
-	return `${inWork} in flight, ${tasks.length} tasks ${forgeNotice(document)}`;
+	const notice = isPartial(document)
+		? `<div class="warning">${forgeNotice(document)}</div>`
+		: "";
+	return `<div class="counts">${inWork} in flight, ${tasks.length} tasks${notice}</div>`;
+}
+
+function page(title: string, heading: string, body: string): string {
+	return layout(title, `<header>${heading}</header>\n${body}`);
 }
 
 export function renderIndex(workspaces: Workspace[]): string {
 	const rows = workspaces.map(
-		({ name }) => `<a href="${href(name)}">${escapeHtml(name)}</a>`,
+		({ name, projects }) =>
+			`<div class="row"><a class="name" href="${href(name)}">${escapeHtml(name)}</a><div class="counts">${projects.length} project${projects.length === 1 ? "" : "s"}</div></div>`,
 	);
-	return layout("dev-task-board", `<h1>Workspaces</h1>${list(rows)}`);
+	return page(
+		"dev-task-board",
+		"<h1>Workspaces</h1>",
+		`<div class="list">${rows.join("\n")}</div>`,
+	);
 }
 
 export function renderOverview(
@@ -200,12 +341,23 @@ export function renderOverview(
 ): string {
 	const rows = workspace.projects.map(
 		({ name }) =>
-			`<a href="${href(workspace.name, name)}">${escapeHtml(name)}</a> <span class="status">${overviewRow(reads.get(workspace.name, name))}</span>`,
+			`<div class="row"><a class="name" href="${href(workspace.name, name)}">${escapeHtml(name)}</a>${counts(reads.get(workspace.name, name))}</div>`,
 	);
-	return layout(
+	return page(
 		workspace.name,
-		`<h1>${escapeHtml(workspace.name)}</h1>${list(rows)}`,
+		`<h1>${escapeHtml(workspace.name)}</h1>`,
+		`<div class="list">${rows.join("\n")}</div>`,
 	);
+}
+
+function written(document: BoardDocument): string {
+	const when = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(document.written_at ?? "")
+		? `${document.written_at?.slice(0, 16).replace("T", " ")} UTC`
+		: document.written_at;
+	const trunk = document.trunk
+		? `, from ${escapeHtml(document.trunk.ref)} ${escapeHtml(document.trunk.commit)}`
+		: "";
+	return `<p class="meta">Written ${escapeHtml(when)}${trunk}.</p>`;
 }
 
 export function renderProject(
@@ -213,23 +365,33 @@ export function renderProject(
 	projectName: string,
 	state: ProjectState | undefined,
 ): string {
-	const heading = `<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p><h1>${escapeHtml(projectName)}</h1>`;
+	const back = `<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
+	const heading = `${back}<h1>${escapeHtml(projectName)}</h1>`;
 	if (state === undefined || state.state === "reading") {
-		return layout(projectName, `${heading}<p>This project is being read.</p>`);
+		return page(
+			projectName,
+			heading,
+			'<p class="meta">This project is being read.</p>',
+		);
 	}
 	if (state.state === "failed") {
-		return layout(
+		return page(
 			projectName,
-			`${heading}<p>The read failed: ${escapeHtml(state.reason)}</p>`,
+			heading,
+			`<div class="notice">The read failed: ${escapeHtml(state.reason)}</div>`,
 		);
 	}
 	const document = state.document as BoardDocument;
-	return layout(
+	const notice = isPartial(document)
+		? `<div class="notice">${forgeNotice(document)}</div>\n`
+		: "";
+	return page(
 		projectName,
-		`${heading}<p class="meta">Written ${escapeHtml(document.written_at)}</p>${document.forge === "full" ? "" : `<p>${forgeNotice(document)}</p>`}${renderDocument(document)}`,
+		heading + written(document),
+		notice + renderDocument(document),
 	);
 }
 
 export function renderNotFound(): string {
-	return layout("Not found", "<h1>Not found</h1>");
+	return page("Not found", "<h1>Not found</h1>", "");
 }

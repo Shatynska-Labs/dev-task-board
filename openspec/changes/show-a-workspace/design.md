@@ -22,7 +22,7 @@
 
 **Counts on the overview.** In flight counts tasks whose `status` is `in_flight`, the document's own word, so this reads a status and derives none.
 
-**Layout.** The accepted page of `scripts/task-board`: the same four sections and `<details>` markup, with inline CSS and no script. The `script` waits for `keep-the-page-current`.
+**Layout.** The accepted page of `scripts/task-board`: the same four sections, `<details>` markup, columns, progress bars and CSS, inline in `src/style.ts`, with no script. The first merge carried simpler markup by mistake, and a fix brought this one in. The `script` waits for `keep-the-page-current`.
 
 **The `Host` check.** Compares with the port actually bound. Ports begin at 1024, so a browser's `Host` always carries one, since it drops `:80`.
 
