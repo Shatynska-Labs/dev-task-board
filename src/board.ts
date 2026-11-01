@@ -93,12 +93,15 @@ export async function startBoard(port: number): Promise<void> {
 			);
 		}
 		const stop = async () => {
+			if (closing.signal.aborted) {
+				return;
+			}
 			closing.abort();
 			await reads.stop();
 			process.exit(0);
 		};
-		process.once("SIGINT", stop);
-		process.once("SIGTERM", stop);
+		process.on("SIGINT", stop);
+		process.on("SIGTERM", stop);
 		console.log(`http://127.0.0.1:${bound}`);
 		await reads.start();
 	} catch (error) {

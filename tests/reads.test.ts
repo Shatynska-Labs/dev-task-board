@@ -473,8 +473,7 @@ describe("A failed read has a reason", () => {
 			return stubTool(
 				root,
 				[
-					`perl -MPOSIX -e 'POSIX::setsid(); open(F, ">", "${pidFile}"); print F $$; close(F); sleep 30' &`,
-					`until [ -s '${pidFile}' ]; do sleep 0.01; done`,
+					`'${process.execPath}' -e 'const held = require("node:child_process").spawn("sleep", ["30"], { detached: true, stdio: "inherit" }); require("node:fs").writeFileSync("${pidFile}", String(held.pid)); held.unref();'`,
 					then,
 				].join("\n"),
 			);

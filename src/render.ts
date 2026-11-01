@@ -226,7 +226,7 @@ export function renderProject(
 	const document = state.document as BoardDocument;
 	return layout(
 		projectName,
-		`${heading}<p class="meta">Written ${escapeHtml(document.written_at)}</p><p>${forgeNotice(document)}</p>${renderDocument(document)}`,
+		`${heading}<p class="meta">Written ${escapeHtml(document.written_at)}</p>${document.forge === "full" ? "" : `<p>${forgeNotice(document)}</p>`}${renderDocument(document)}`,
 	);
 }
 
