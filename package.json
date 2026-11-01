@@ -1,6 +1,6 @@
 {
 	"name": "dev-task-board",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "A local board of development tasks, read from your Git repositories.",
 	"license": "MIT",
 	"type": "module",
@@ -33,7 +33,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.6.4",
-		"@types/node": "^26.6.6",
+		"@types/node": "^24.19.2",
 		"simple-git-hooks": "^2.14.0",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.5"
@@ -41,5 +41,8 @@
 	"simple-git-hooks": {
 		"pre-commit": "npm exec --no -- biome ci .",
 		"pre-push": "npm run typecheck && npm test"
+	},
+	"dependencies": {
+		"smol-toml": "^1.9.1"
 	}
 }

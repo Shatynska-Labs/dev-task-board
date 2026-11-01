@@ -23,6 +23,12 @@ function runCommand(script: string, args: string[], cwd: string) {
 	return spawnSync(process.execPath, [script, ...args], {
 		cwd,
 		encoding: "utf8",
+		env: {
+			...process.env,
+			HOME: cwd,
+			XDG_CONFIG_HOME: join(cwd, ".config"),
+		},
+		timeout: 10_000,
 	});
 }
 
@@ -76,7 +82,6 @@ describe("The command reports its version", () => {
 
 	describe("Run with no supported argument", () => {
 		const unsupported: [string, string[]][] = [
-			["no arguments", []],
 			["an unknown option", ["--unknown"]],
 			["an unknown word", ["serve"]],
 			["--version with something else", ["--version", "--unknown"]],

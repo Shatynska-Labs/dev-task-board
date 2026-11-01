@@ -56,7 +56,18 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Status
 
-It does nothing useful yet: `npx dev-task-board --version` prints its version, and the board arrives through the workstream `see-my-projects-live`.
+It shows each project's tasks as they stood at start, and restarting is the only refresh until the workstream `see-my-projects-live` delivers more. `github_account` is refused for now, until `switch-between-workspaces`.
+
+## Running it
+
+Write `~/.config/dev-task-board/config.toml`, or the same under `$XDG_CONFIG_HOME`:
+
+```toml
+[workspaces.work]
+projects = ["~/projects/one", "~/projects/two"]
+```
+
+Then run `npx dev-task-board`, and open the address it prints, `http://127.0.0.1:8766`. `--port` takes another, from 1024.
 
 ## Development
 
