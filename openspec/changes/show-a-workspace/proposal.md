@@ -29,7 +29,7 @@ The command that refused every other invocation now starts the board, so the `pa
 
 ## Impact
 
-- New: `src/` modules, their tests, and document fixtures under `tests/support/`.
+- New: `src/` modules and their tests.
 - Changed: `tests/cli.test.ts`, which held the refusal this replaces; `.github/dependabot.yml`; `README.md`.
 - `package.json`: a runtime dependency, and the version rises to `0.2.0`, which the release workflow publishes once the trusted publisher exists.
 - Not here: refreshing (`keep-the-page-current`), keeping a last document (`say-what-a-read-missed`), tabs and `github_account` (`switch-between-workspaces`), the setup command (`write-the-settings`).

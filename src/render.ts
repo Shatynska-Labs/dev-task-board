@@ -76,7 +76,7 @@ ${body}
 function forgeNotice(document: BoardDocument): string {
 	return document.forge === "full"
 		? ""
-		: `<p class="notice">The forge read was ${escapeHtml(document.forge)}: statuses may be wrong.</p>`;
+		: `<span class="notice">The forge read was ${escapeHtml(document.forge)}: statuses may be wrong.</span>`;
 }
 
 function details(summary: string, body: string): string {
@@ -184,7 +184,7 @@ function overviewRow(state: ProjectState | undefined): string {
 	const document = state.document as BoardDocument;
 	const tasks = document.tasks ?? [];
 	const inWork = tasks.filter((task) => task.status === "in_flight").length;
-	return `${inWork} in flight, ${tasks.length} tasks${forgeNotice(document)}`;
+	return `${inWork} in flight, ${tasks.length} tasks ${forgeNotice(document)}`;
 }
 
 export function renderIndex(workspaces: Workspace[]): string {
@@ -226,7 +226,7 @@ export function renderProject(
 	const document = state.document as BoardDocument;
 	return layout(
 		projectName,
-		`${heading}<p class="meta">Written ${escapeHtml(document.written_at)}</p>${forgeNotice(document)}${renderDocument(document)}`,
+		`${heading}<p class="meta">Written ${escapeHtml(document.written_at)}</p><p>${forgeNotice(document)}</p>${renderDocument(document)}`,
 	);
 }
 

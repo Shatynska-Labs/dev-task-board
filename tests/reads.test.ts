@@ -468,6 +468,64 @@ describe("A failed read has a reason", () => {
 		});
 	});
 
+	describe("A process that left the group and holds the pipes", () => {
+		function holdingTool(root: string, pidFile: string, then: string) {
+			return stubTool(
+				root,
+				[
+					`perl -MPOSIX -e 'POSIX::setsid(); open(F, ">", "${pidFile}"); print F $$; close(F); sleep 30' &`,
+					`until [ -s '${pidFile}' ]; do sleep 0.01; done`,
+					then,
+				].join("\n"),
+			);
+		}
+
+		it("holds the document without waiting for it", async () => {
+			const root = temporaryDirectory();
+			const holder = join(root, "holder.pid");
+			const reads = createReads(oneProject(root), {
+				toolPath: holdingTool(
+					root,
+					holder,
+					`echo '${JSON.stringify(minimalDocument)}'`,
+				),
+				limitMs: 10_000,
+				graceMs: 200,
+			});
+
+			const before = Date.now();
+			await reads.start();
+			readPid(holder);
+
+			expect(get(reads).state).toBe("read");
+			expect(Date.now() - before).toBeLessThan(5000);
+		});
+
+		it("does not hold stop() past the grace", async () => {
+			const root = temporaryDirectory();
+			const holder = join(root, "holder.pid");
+			const toolPid = join(root, "tool.pid");
+			const reads = createReads(oneProject(root), {
+				toolPath: holdingTool(
+					root,
+					holder,
+					`echo $$ > '${toolPid}'\nexec sleep 60`,
+				),
+				limitMs: 20_000,
+				graceMs: 200,
+			});
+
+			const finished = reads.start();
+			await waitUntil(() => holdsPid(toolPid));
+			readPid(holder);
+			const before = Date.now();
+			await reads.stop();
+			await finished;
+
+			expect(Date.now() - before).toBeLessThan(5000);
+		});
+	});
+
 	describe("A tool that exits zero with bad output", () => {
 		it("has failed, saying the output could not be read", async () => {
 			const root = temporaryDirectory();

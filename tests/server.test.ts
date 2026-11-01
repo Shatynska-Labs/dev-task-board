@@ -234,6 +234,7 @@ describe("Addresses reach workspaces and projects", () => {
 			"/api/",
 			"/api/work",
 			"/__proto__",
+			"*",
 			"/constructor",
 			"/work/constructor",
 		])("answers %s with 404", async (path) => {

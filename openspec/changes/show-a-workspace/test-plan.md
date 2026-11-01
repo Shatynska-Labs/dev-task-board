@@ -206,3 +206,9 @@ Written at `apply`, against the promotion list above.
 - `stubTool`, `printsDocument`, `waitUntil`, `isRunning`: kept local to the files using them until a later change needs them too.
 - How a server closes: `startServer` takes an optional `AbortSignal`, which `src/board.ts` uses, and resolves to the port as tests expect.
 - `tests/cli.test.ts`: the no-arguments refusal is out, and every spawn has a temporary `HOME` and `XDG_CONFIG_HOME` and a timeout.
+- Every other row of the table: kept local, because each serves one test file and this is the first change with such tests. That covers `oneWorkspace`, `readEverything`, `read`, `reading`, `failed`, `useIsolatedProcessEnvironment`, `readPid`, `holdsPid`, `pidsIn`, `lines`, `slowGh`, `settingsFile`, `writeSettings`, `workspaceWith`, `fixtureProject`, `validEnvironment`, `pathWithout`, `start`, `listening`, `expectRefused`, `occupy`, `close`, `freePort`, `isFree`, `get`, `request`, `directories`, `workspace`, `refusal`, `textOf`, `detailsBlocks`, `smallestDetailsHolding`, `expectInOrder`, `escapedLink` and the second commit form.
+- `run` in `tests/board.test.ts` and `runCommand` in `tests/cli.test.ts`: kept apart. They overlap, but `run` also builds a settings environment, and `tests/cli.test.ts` needs none. The next change touching both should merge them.
+
+## Task 4.3's run
+
+With temporary settings naming the three projects, `gh` logged in, on 2026-11-01: `dev-task-board` 6 tasks, 2 in flight; `ai-toolkit` 30 tasks, 1 in flight; `basis` 13 tasks, 0 in flight. Each equals `--json`, every task's name was on its page, `forge` was `full`, a `Host` of `evil.example` got 403, and `SIGINT` exited zero.

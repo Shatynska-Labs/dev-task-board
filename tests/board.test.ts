@@ -423,6 +423,11 @@ describe("Bad settings refuse the start", () => {
 			["text that is not TOML", "[workspaces\n", undefined],
 			["a reserved name", '[workspaces.api]\nprojects = ["/"]\n', "api"],
 			[
+				"a path the system cannot answer for",
+				'[workspaces.work]\nprojects = ["/tmp/a\\u0000b"]\n',
+				"not a directory",
+			],
+			[
 				"a github account",
 				'[workspaces.work]\nprojects = ["/"]\ngithub_account = "x"\n',
 				"github_account",

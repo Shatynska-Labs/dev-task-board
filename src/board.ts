@@ -40,7 +40,11 @@ function checkRequiredCommands(): void {
 }
 
 function isDirectory(path: string): boolean {
-	return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+	try {
+		return statSync(path).isDirectory();
+	} catch {
+		return false;
+	}
 }
 
 function readSettings(): Workspace[] {

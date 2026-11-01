@@ -25,6 +25,7 @@ export type Reads = {
 
 const KNOWN_SCHEMA = 1;
 const POLL_MS = 20;
+const DRAIN_MS = 1000;
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,6 +115,7 @@ export function createReads(
 			let stdout = "";
 			let stderr = "";
 			let limitPassed = false;
+			let exited = false;
 			let stopping: Promise<void> | undefined;
 			child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
 				stdout += chunk;
@@ -122,7 +124,7 @@ export function createReads(
 				stderr += chunk;
 			});
 			const stop = () => {
-				if (child.pid !== undefined) {
+				if (!exited && child.pid !== undefined) {
 					stopping ??= stopGroup(child.pid, options.graceMs);
 				}
 				return stopping ?? Promise.resolve();
@@ -134,6 +136,7 @@ export function createReads(
 			if (child.pid !== undefined) {
 				running.set(child.pid, stop);
 			}
+			const closed = new Promise((closes) => child.once("close", closes));
 			const finish = (state: ProjectState) => {
 				clearTimeout(timer);
 				if (child.pid !== undefined) {
@@ -144,8 +147,16 @@ export function createReads(
 			child.on("error", (error) => {
 				finish({ state: "failed", reason: error.message });
 			});
-			child.on("close", async (code, signal) => {
+			// Not "close": a process that left the group can hold the pipes open
+			// for as long as it likes, and neither the limit nor a stop may wait
+			// for it.
+			child.on("exit", async (code, signal) => {
+				exited = true;
+				clearTimeout(timer);
 				await stopping;
+				await Promise.race([closed, delay(DRAIN_MS)]);
+				child.stdout.destroy();
+				child.stderr.destroy();
 				if (limitPassed) {
 					finish({
 						state: "failed",

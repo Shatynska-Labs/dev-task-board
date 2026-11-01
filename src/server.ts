@@ -23,6 +23,9 @@ function answer(response: ServerResponse, status: number, html: string): void {
 
 function decodedSegments(url: string): string[] | undefined {
 	const [path = ""] = url.split("?");
+	if (!path.startsWith("/")) {
+		return undefined;
+	}
 	try {
 		return path.split("/").slice(1).map(decodeURIComponent);
 	} catch {
@@ -60,8 +63,8 @@ export function startServer(
 	port: number,
 	signal?: AbortSignal,
 ): Promise<number> {
+	let bound = port;
 	const server = createServer((request, response) => {
-		const { port: bound } = server.address() as AddressInfo;
 		const { host } = request.headers;
 		if (host !== `127.0.0.1:${bound}` && host !== `localhost:${bound}`) {
 			answer(response, 403, renderNotFound());
@@ -79,7 +82,8 @@ export function startServer(
 		server.once("error", reject);
 		server.listen({ port, host: HOST, signal }, () => {
 			server.off("error", reject);
-			resolve((server.address() as AddressInfo).port);
+			bound = (server.address() as AddressInfo).port;
+			resolve(bound);
 		});
 	});
 }
