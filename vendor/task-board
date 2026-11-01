@@ -1,0 +1,805 @@
+#!/usr/bin/env bash
+# Writes one self-contained HTML page of one project's tasks, or prints them as
+# JSON, read from its trunk. See `--help` for usage; see tests/README.md for the report contract
+# this script implements against. The status lookups in status() below are the
+# ones rules/workstreams.md states, in its order: change them together.
+set -u
+
+# Inherited from a hook or wrapper, these would point every git call below at
+# the caller's repository instead of the target.
+if command -v git >/dev/null 2>&1; then
+  # shellcheck disable=SC2046 # word splitting is intended: one name per word
+  unset $(git rev-parse --local-env-vars 2>/dev/null)
+fi
+unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE TB_FORMAT
+export GIT_TERMINAL_PROMPT=0 GIT_OPTIONAL_LOCKS=0
+
+PR_LIMIT=5000
+
+print_help() {
+  cat <<'HELP'
+task-board — write one HTML page of a project's tasks, or print them as JSON
+
+Usage:
+  task-board [--help|-h] [--output FILE | --json] [TARGET_DIR]
+
+Shows what is in flight and at what stage, each open workstream with its steps,
+and every task no workstream holds. Everything is read from the trunk as
+fetched, except a task in flight, whose change is read from its branch.
+Status is derived and never stored.
+
+Arguments:
+  TARGET_DIR      The project. Defaults to the current working directory.
+
+Flags:
+  --output FILE   Where to write the page. Defaults to
+                  task-board-<project>.html in the temporary directory.
+  --json          Print the board as one JSON document on standard output
+                  instead of writing a page, and this report on standard error.
+                  Its schema_version rises when a field goes or changes meaning.
+  --help, -h      Show this help and exit. Writes nothing.
+
+Outcomes and exit codes:
+  0   SUCCESS   the page was written, or the document printed
+  1   ERROR     the page or the document could not be finished
+  2   BLOCKED   a precondition was unmet; nothing was written or printed
+
+Changes nothing in the project but what `git fetch` brings in. Uses `gh` where
+it can; without it the page says the forge was not reached.
+HELP
+}
+
+# --- Arguments. -------------------------------------------------------------
+# Fixed before anything is reported, so the stream does not depend on where
+# --json comes among the arguments: fd 3 is the caller's standard output.
+JSON=no
+for arg in "$@"; do
+  if [ "$arg" = --json ]; then JSON=yes; fi
+done
+if [ "$JSON" = yes ]; then exec 3>&1 1>&2; fi
+
+TARGET=""
+OUTPUT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --help|-h)
+      if [ "$JSON" = yes ]; then print_help >&3; else print_help; fi
+      exit 0 ;;
+    --json) ;;
+    --output)
+      if [ $# -lt 2 ]; then echo "Outcome: BLOCKED"; echo "Reason: --output needs a file"; exit 2; fi
+      OUTPUT="$2"; shift ;;
+    --output=*) OUTPUT="${1#--output=}" ;;
+    -*) echo "Outcome: BLOCKED"; echo "Reason: unknown flag $1"; exit 2 ;;
+    *)
+      if [ -n "$TARGET" ]; then echo "Outcome: BLOCKED"; echo "Reason: more than one target"; exit 2; fi
+      TARGET="$1" ;;
+  esac
+  shift
+done
+[ -n "$TARGET" ] || TARGET="."
+if [ "$JSON" = yes ] && [ -n "$OUTPUT" ]; then
+  echo "Outcome: BLOCKED"
+  echo "Reason: --json prints to standard output, so --output has no meaning with it"
+  exit 2
+fi
+
+block() {
+  echo "Outcome: BLOCKED"
+  echo "Reason: $1"
+  exit 2
+}
+
+GIVEN="$TARGET"
+if ! TARGET="$(cd "$GIVEN" 2>/dev/null && pwd -P)"; then
+  echo "Target: $GIVEN"
+  block "the target is not a directory"
+fi
+echo "Target: $TARGET"
+
+ROOT=""
+g() { git -C "${ROOT:-$TARGET}" "$@" 3>&-; }
+
+command -v git >/dev/null 2>&1 || block "git is not installed"
+g rev-parse --git-dir >/dev/null 2>&1 || block "the target is not a Git repository"
+# Every path below is from the top of the repository, wherever the target sits in it.
+ROOT="$(g rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+[ -n "$ROOT" ] || block "the target has no working tree, as in a bare repository"
+
+# --- The trunk. --------------------------------------------------------------
+FETCHED=yes
+HAS_ORIGIN=no
+if g remote get-url origin >/dev/null 2>&1; then
+  HAS_ORIGIN=yes
+  g -c fetch.prune=false fetch --quiet --no-prune origin >/dev/null 2>&1 || FETCHED=no
+fi
+
+if [ "$HAS_ORIGIN" = yes ]; then
+  TRUNK="$(g symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  if [ -n "$TRUNK" ] && ! g rev-parse -q --verify "$TRUNK^{commit}" >/dev/null 2>&1; then TRUNK=""; fi
+  if [ -z "$TRUNK" ]; then
+    for candidate in origin/main origin/master; do
+      if g rev-parse -q --verify "$candidate^{commit}" >/dev/null 2>&1; then TRUNK="$candidate"; break; fi
+    done
+  fi
+  if [ -z "$TRUNK" ]; then
+    g rev-parse -q --verify 'HEAD^{commit}' >/dev/null 2>&1 || block "the repository has no commit"
+    block "no trunk could be resolved from origin"
+  fi
+  TRUNK_NAME="${TRUNK#origin/}"
+else
+  g rev-parse -q --verify 'HEAD^{commit}' >/dev/null 2>&1 || block "the repository has no commit"
+  TRUNK="HEAD"
+  TRUNK_NAME="$(g rev-parse --abbrev-ref HEAD)"
+fi
+
+on_trunk() { g cat-file -e "$TRUNK:$1" 2>/dev/null; }
+
+if ! on_trunk docs/backlog && on_trunk docs/backlog.md; then
+  block "the backlog is the single file docs/backlog.md; convert it with scripts/backlog-migrate"
+fi
+if ! on_trunk docs/backlog && ! on_trunk docs/workstreams; then
+  block "the trunk holds neither docs/backlog/ nor docs/workstreams/; scripts/project-init writes them"
+fi
+
+# --- The page's path. --------------------------------------------------------
+COMMON="$(g rev-parse --git-common-dir)"
+case "$COMMON" in /*) ;; *) COMMON="$ROOT/$COMMON" ;; esac
+PROJECT="$(basename "$(cd "$COMMON/.." && pwd -P)")"
+if [ "$JSON" = no ] && [ -z "$OUTPUT" ]; then OUTPUT="${TMPDIR:-/tmp}/task-board-$PROJECT.html"; fi
+
+if ! WORK="$(mktemp -d "${TMPDIR:-/tmp}/task-board.XXXXXX")"; then
+  echo "Outcome: ERROR"
+  echo "Reason: no temporary directory could be made"
+  exit 1
+fi
+PAGE_TMP=""
+trap 'rm -rf "$WORK"; if [ -n "$PAGE_TMP" ]; then rm -f "$PAGE_TMP"; fi' EXIT
+
+error() {
+  echo "Outcome: ERROR"
+  echo "Reason: $1"
+  exit 1
+}
+
+# --- A snapshot of the trunk. ------------------------------------------------
+mkdir -p "$WORK/tree"
+PATHS=""
+for path in docs/backlog docs/workstreams openspec/changes; do
+  if on_trunk "$path"; then PATHS="$PATHS $path"; fi
+done
+# Through an index of its own rather than `git archive`, which honours export-ignore.
+GIT_INDEX_FILE="$WORK/index" g read-tree "$TRUNK" || error "the trunk could not be read"
+# shellcheck disable=SC2086 # word splitting is intended: the paths hold no spaces
+GIT_INDEX_FILE="$WORK/index" g ls-files -z -- $PATHS > "$WORK/paths" || error "the trunk could not be read"
+GIT_INDEX_FILE="$WORK/index" g checkout-index -z --stdin --prefix="$WORK/tree/" < "$WORK/paths" \
+  || error "the trunk could not be read"
+TREE="$WORK/tree"
+
+# --- The name sets, one sorted file each. ------------------------------------
+names_of() { [ -d "$1" ] && find "$1" -mindepth 1 -maxdepth 1 "${@:2}" -print | sed 's#.*/##'; }
+
+{ names_of "$TREE/openspec/changes/archive" -type d | sed 's/^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]-//'; } | LC_ALL=C sort -u > "$WORK/archived"
+{ names_of "$TREE/openspec/changes" -type d | grep -vx archive; } | LC_ALL=C sort -u > "$WORK/open"
+{ names_of "$TREE/docs/backlog" -type f -name '*.md' | sed 's/\.md$//' | grep -vxE 'AGENTS|CLAUDE|README'; } | LC_ALL=C sort -u > "$WORK/entries"
+{ names_of "$TREE/docs/workstreams" -type f -name '*.md' | sed 's/\.md$//' | grep -vxE 'AGENTS|CLAUDE|README'; } | LC_ALL=C sort -u > "$WORK/workstreams"
+
+not_trunk() { grep -vxF -e "$TRUNK_NAME" -e main -e master; }
+
+g for-each-ref --format='%(refname)' refs/heads | sed 's#^refs/heads/##' | not_trunk | LC_ALL=C sort -u > "$WORK/local"
+REMOTE_READ=no
+: > "$WORK/remote"
+if [ "$HAS_ORIGIN" = yes ] && listed="$(g ls-remote --heads origin 2>/dev/null)"; then
+  REMOTE_READ=yes
+  printf '%s\n' "$listed" | sed -n 's#.*refs/heads/##p' | not_trunk | LC_ALL=C sort -u > "$WORK/remote"
+fi
+LC_ALL=C sort -u "$WORK/local" "$WORK/remote" > "$WORK/branches"
+
+FORGE=none
+: > "$WORK/prs"
+if command -v gh >/dev/null 2>&1; then
+  # shellcheck disable=SC2016 # the template is gh's, not the shell's
+  if ( cd "${ROOT:-$TARGET}" && gh pr list --state all --limit "$PR_LIMIT" --json headRefName,state \
+      --template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' ) > "$WORK/prs" 2>/dev/null 3>&-; then
+    FORGE=full
+    if [ "$(wc -l < "$WORK/prs")" -ge "$PR_LIMIT" ]; then FORGE=partly; fi
+  else
+    : > "$WORK/prs"
+  fi
+fi
+awk -F'\t' '$2 == "OPEN" { print $1 }' "$WORK/prs" | not_trunk | LC_ALL=C sort -u > "$WORK/prs-open"
+awk -F'\t' '$2 == "MERGED" { print $1 }' "$WORK/prs" | LC_ALL=C sort -u > "$WORK/prs-merged"
+
+# --- The last commit of each name. -------------------------------------------
+g -c core.quotePath=false log --format='@@%ct' --name-only "$TRUNK" -- docs/backlog openspec/changes | awk '
+  /^@@/ { t = substr($0, 3); next }
+  /^docs\/backlog\/[^\/]+\.md$/ { n = $0; sub(/^docs\/backlog\//, "", n); sub(/\.md$/, "", n) }
+  /^openspec\/changes\/archive\/[^\/]+\// { n = $0; sub(/^openspec\/changes\/archive\//, "", n); sub(/\/.*/, "", n); sub(/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-/, "", n) }
+  /^openspec\/changes\/[^\/]+\// { if ($0 !~ /^openspec\/changes\/archive\//) { n = $0; sub(/^openspec\/changes\//, "", n); sub(/\/.*/, "", n) } }
+  n != "" { if (!(n in seen)) { seen[n] = 1; print n "\t" t }; n = "" }
+' > "$WORK/last-trunk"
+
+g for-each-ref --no-merged "$TRUNK" --format='%(committerdate:unix) %(refname)' refs/heads refs/remotes/origin | awk -v listed="$WORK/remote" '
+  BEGIN { while ((getline l < listed) > 0) on[l] = 1 }
+  {
+    n = $2
+    if (n ~ /^refs\/heads\//) sub(/^refs\/heads\//, "", n)
+    else { sub(/^refs\/remotes\/origin\//, "", n); if (!(n in on)) next }
+    if (!(n in t) || $1 > t[n]) t[n] = $1
+  }
+  END { for (n in t) print n "\t" t[n] }
+' > "$WORK/last-branch"
+
+# --- What is in flight, and what its branch says. -----------------------------
+export TB_WORK="$WORK" TB_TREE="$TREE" TB_PROJECT="$PROJECT" TB_TRUNK="$TRUNK" TB_FORGE="$FORGE"
+
+cat > "$WORK/common.awk" <<'AWK'
+function load(file, into,   l) {
+  while ((getline l < file) > 0) into[l] = 1
+  close(file)
+}
+function sets() {
+  W = ENVIRON["TB_WORK"]
+  load(W "/archived", ARCH); load(W "/open", OPEN); load(W "/entries", ENT)
+  load(W "/branches", BR); load(W "/prs-open", PRO); load(W "/prs-merged", PRM)
+}
+# The lookups of rules/workstreams.md, in its order.
+function status(n) {
+  if ((n in ARCH) || (!(n in OPEN) && (n in PRM))) return "done"
+  if ((n in OPEN) || (n in BR) || (n in PRO)) return "flight"
+  if (n in ENT) return "recorded"
+  return "planned"
+}
+AWK
+
+cat > "$WORK/flight.awk" <<'AWK'
+BEGIN { sets() }
+status($0) == "flight"
+AWK
+
+# A branch or pull request is a task only under a one-word kebab-case name; a
+# change, an entry or a step is one whatever its name.
+LC_ALL=C sort -u "$WORK/branches" "$WORK/prs-open" | grep -xE '[a-z0-9]+(-[a-z0-9]+)*' > "$WORK/kebab"
+while IFS= read -r name; do
+  awk '
+    /^(- )?\*\*Steps\*\*/ { on = 1; next }
+    on && /^(- \*\*|## )/ { on = 0 }
+    on && /^[0-9]+\. `[^`]+`/ { n = $0; sub(/^[0-9]+\. `/, "", n); sub(/`.*/, "", n); print n }
+  ' "$TREE/docs/workstreams/$name.md"
+done < "$WORK/workstreams" > "$WORK/steps"
+LC_ALL=C sort -u "$WORK/open" "$WORK/entries" "$WORK/steps" "$WORK/kebab" \
+  | awk -f "$WORK/common.awk" -f "$WORK/flight.awk" > "$WORK/flight"
+
+first_copy() {
+  # first_copy NAME FILE: the file from the first place that holds it.
+  local ref
+  for ref in "refs/heads/$1" "$REMOTE_REF" "$TRUNK"; do
+    [ -n "$ref" ] || continue
+    if g show "$ref:openspec/changes/$1/$2" 2>/dev/null; then return 0; fi
+  done
+  return 1
+}
+
+in_set() { grep -qxF -- "$1" "$WORK/$2"; }
+
+while IFS= read -r name; do
+  REMOTE_REF=""
+  if in_set "$name" remote && g rev-parse -q --verify "refs/remotes/origin/$name" >/dev/null 2>&1; then
+    REMOTE_REF="refs/remotes/origin/$name"
+  fi
+  proposal="$(first_copy "$name" proposal.md)"; has_proposal=$?
+  tasks="$(first_copy "$name" tasks.md)" || tasks=""
+  # shellcheck disable=SC2016 # the backticks are the text being matched
+  ws="$(printf '%s\n' "$proposal" | sed -n 's/^\(- \)\{0,1\}\*\*Workstream\*\*:[^`]*`\([^`]*\)`.*/\2/p' | head -n 1)"
+  case "$ws" in none|nothing) ws="" ;; esac
+  ticked="$(printf '%s\n' "$tasks" | grep -c '^- \[[xX]\]')"
+  waiting="$(printf '%s\n' "$tasks" | grep -c '^- \[ \]')"
+  if in_set "$name" open && in_set "$name" prs-merged; then stage="ship:merged"
+  elif in_set "$name" prs-open; then stage="ship:pr-open"
+  elif in_set "$name" remote && [ -z "$REMOTE_REF" ] && ! in_set "$name" local && ! in_set "$name" open; then stage="unknown"
+  elif [ "$ticked" -gt 0 ]; then stage="build:applying $ticked/$((ticked + waiting))"
+  elif [ "$has_proposal" -eq 0 ]; then stage="plan:drafting"
+  else stage="plan:exploring"
+  fi
+  change=no
+  if in_set "$name" open || [ "$has_proposal" -eq 0 ]; then change=yes; fi
+  printf '%s\t%s\t%s\t%s\n' "$name" "$stage" "$ws" "$change"
+done < "$WORK/flight" > "$WORK/flight-info"
+
+# --- The page. ---------------------------------------------------------------
+cat > "$WORK/style.css" <<'CSS'
+:root {
+  --bg: #f5f7f8; --panel: #ffffff; --fg: #18242b; --muted: #5c6c75; --line: #d9e0e4;
+  --done: #2f7d5b; --work: #1f63c4; --work-soft: #e2ecfa; --warn: #a3620c; --warn-soft: #f8ecd8;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #12191e; --panel: #1a242a; --fg: #e4ebee; --muted: #93a3ac; --line: #2e3c44;
+  --done: #5bb78f; --work: #7fb0f5; --work-soft: #1f3250; --warn: #e3a955; --warn-soft: #3c2e17; color-scheme: dark } }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5 }
+main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
+header { display: grid; gap: 4px }
+h1 { font-size: 24px; margin: 0 }
+h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600 }
+.meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin: 0 }
+.notice { color: var(--warn); background: var(--warn-soft); padding: 8px 12px; border-radius: 6px; font-size: 13px; display: grid; gap: 2px }
+.warning { color: var(--warn); font-size: 12px; margin: 0 }
+.name { font-family: var(--mono); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; min-width: 0 }
+.list { background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 170px 76px minmax(0, 220px); gap: 6px 16px; align-items: center; padding: 12px 14px }
+.work + .work { border-top: 1px solid var(--line) }
+.workhead { padding-block: 8px; font-size: 12px; color: var(--muted) }
+.pipe { display: flex; gap: 3px; margin-bottom: 3px }
+.pipe i { flex: 1; height: 6px; background: var(--line); border-radius: 2px }
+.pipe i.on { background: var(--work) }
+.pipe i.past { background: var(--done) }
+.stage { font-family: var(--mono); font-size: 13px }
+.ws { font-size: 13px; overflow-wrap: anywhere; min-width: 0; display: grid }
+.ws a { color: var(--work); font-family: var(--mono) }
+.ws.none { color: var(--muted) }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px }
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; margin-left: 6px }
+.tags .tag { margin-left: 0 }
+.mark { color: var(--warn); font-size: 12px; margin-left: 6px }
+.groups { display: grid; gap: 8px }
+details.group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
+details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: 14px minmax(0, 1fr) 150px; gap: 10px; align-items: center }
+summary::-webkit-details-marker { display: none }
+summary:focus-visible, a:focus-visible { outline: 2px solid var(--work); outline-offset: 2px }
+.chev { color: var(--muted); font-size: 11px }
+details[open] > summary .chev { transform: rotate(90deg) }
+.sub { color: var(--muted); font-size: 13px; margin-top: 2px }
+.progress { display: grid; gap: 3px; font-size: 12px; color: var(--muted); text-align: right }
+.bar { display: flex; gap: 3px }
+.bar u { flex: 1; height: 8px; border-radius: 2px; border: 1px solid var(--line) }
+.bar u.done { background: var(--done); border-color: var(--done) }
+.bar u.flight { background: var(--work); border-color: var(--work) }
+.bar u.planned { border-style: dashed; border-color: var(--muted) }
+.body { border-top: 1px solid var(--line); padding: 12px 14px 14px; display: grid; gap: 12px; min-width: 0 }
+.def { margin: 0; font-size: 14px; max-width: 70ch }
+.def strong { color: var(--muted); font-weight: 600 }
+ol.steps, ul.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
+.rowgrid, details.task > summary { display: grid; grid-template-columns: 96px minmax(0, 1fr) 76px 56px; gap: 10px; align-items: start }
+details.task > summary { list-style: none; cursor: pointer }
+.rowhead { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px }
+.st { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; height: 21px; color: var(--muted) }
+.st::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box; flex: none }
+.st.done { color: var(--done) } .st.done::before { background: var(--done); border-color: var(--done) }
+.st.flight { color: var(--work) } .st.flight::before { border-color: var(--work); background: linear-gradient(90deg, var(--work) 50%, transparent 50%) }
+.st.planned::before { border-style: dotted }
+.desc { font-size: 13.5px; color: var(--muted); margin: 1px 0 0; max-width: 72ch }
+.stage-inline { font-family: var(--mono); font-size: 12px; color: var(--work); background: var(--work-soft); padding: 0 5px; border-radius: 3px; margin-left: 6px; white-space: nowrap }
+.ago { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 21px }
+.more { font-size: 12px; color: var(--work); text-decoration: underline; height: 21px; display: inline-flex; align-items: center }
+.more::before { content: "details" }
+details[open].task .more::before { content: "hide" }
+.full { font-size: 13.5px; color: var(--muted); margin: 6px 0 0 106px; max-width: 72ch; overflow-wrap: anywhere }
+.full code, .def code, .desc code { font-family: var(--mono); font-size: .93em }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px }
+@media (max-width: 640px) {
+  .work { grid-template-columns: 1fr }
+  .workhead, .rowhead { display: none }
+  details.group > summary { grid-template-columns: 14px minmax(0, 1fr) }
+  .progress { grid-column: 2; text-align: left }
+  .rowgrid, details.task > summary { grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px }
+  .st { grid-column: 1 / -1 }
+  .full { margin-left: 0 }
+}
+CSS
+
+cat > "$WORK/board.awk" <<'AWK'
+function esc(s) {
+  gsub(/&/, "\\&amp;", s); gsub(/</, "\\&lt;", s); gsub(/>/, "\\&gt;", s); gsub(/"/, "\\&quot;", s)
+  return s
+}
+function pair(s, mark, before, after,   o, i, j) {
+  o = ""
+  while ((i = index(s, mark)) > 0) {
+    j = index(substr(s, i + length(mark)), mark)
+    if (!j) break
+    o = o substr(s, 1, i - 1) before substr(s, i + length(mark), j - 1) after
+    s = substr(s, i + length(mark) + j - 1 + length(mark))
+  }
+  return o s
+}
+function inline(s) { return pair(pair(esc(s), "`", "<code>", "</code>"), "**", "<strong>", "</strong>") }
+function unquote(s,   o, i, c) {
+  if (length(s) < 2 || substr(s, 1, 1) != "\"" || substr(s, length(s)) != "\"") return s
+  s = substr(s, 2, length(s) - 2); o = ""
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (c == "\\" && i < length(s)) { i++; c = substr(s, i, 1) }
+    o = o c
+  }
+  return o
+}
+function tsv(file, kind,   l, f) {
+  while ((getline l < file) > 0) {
+    split(l, f, "\t")
+    if (kind == "last") LAST[f[1]] = f[2]
+    else { STAGE[f[1]] = f[2]; PROP[f[1]] = f[3]; CHG[f[1]] = f[4]; FLIGHT[++FL] = f[1] }
+  }
+  close(file)
+}
+function read_entry(n,   f, l, st, b, k, v, raw) {
+  f = ENVIRON["TB_TREE"] "/docs/backlog/" n ".md"
+  st = 0; b = ""; EWS[n] = ""; EPRI[n] = "normal"
+  while ((getline l < f) > 0) {
+    sub(/\r$/, "", l)
+    if (st == 0) { st = (l == "---") ? 1 : 2; if (st == 1) continue }
+    if (st == 1) {
+      if (l == "---") { st = 3; continue }
+      k = l; sub(/:.*/, "", k); v = l; sub(/^[^:]*: */, "", v)
+      if (k == "priority") EPRI[n] = v
+      else if (k == "workstream") EWS[n] = v
+      else if (k == "summary") ESUM[n] = unquote(v)
+      else if (k == "waits_on") { gsub(/[\[\]]/, "", v); EWAIT[n] = v }
+      continue
+    }
+    if (l != "") b = b "<p class=\"full\">" inline((l ~ /^- /) ? substr(l, 3) : l) "</p>\n"
+    if (l != "" || raw != "") raw = raw l "\n"
+  }
+  close(f)
+  if (st != 3) { ENOFM[n] = 1; W_N++ }
+  if (EWS[n] == "none" || EWS[n] == "nothing") EWS[n] = ""
+  EBODY[n] = b
+  sub(/\n+$/, "", raw)
+  ERAW[n] = raw
+}
+function read_ws(i, n,   f, l, v, in_steps, s, name, desc) {
+  f = ENVIRON["TB_TREE"] "/docs/workstreams/" n ".md"
+  in_steps = 0; s = 0; NWW[i] = 0
+  while ((getline l < f) > 0) {
+    sub(/\r$/, "", l)
+    v = l; sub(/^- /, "", v)
+    if (v ~ /^\*\*Goal\*\*:/) { sub(/^\*\*Goal\*\*: */, "", v); if (!(i in GOAL)) GOAL[i] = v }
+    else if (v ~ /^\*\*Done when\*\*:/) { sub(/^\*\*Done when\*\*: */, "", v); if (!(i in DONEW)) DONEW[i] = v }
+    else if (v ~ /^\*\*Summary\*\*:/) { sub(/^\*\*Summary\*\*: */, "", v); if (!(i in WSUM)) WSUM[i] = v }
+    if (in_steps && l ~ /^(- \*\*|## )/) in_steps = 0
+    if (v ~ /^\*\*Steps\*\*/) { in_steps = 1; continue }
+    if (!in_steps || l !~ /^[0-9]+\. /) continue
+    if (l ~ /^[0-9]+\. `[^`]+`/) {
+      name = l; sub(/^[0-9]+\. `/, "", name); desc = name
+      sub(/`.*/, "", name); sub(/^[^`]*`/, "", desc); sub(/^ *(—|-|:) */, "", desc)
+      s++; SN[i, s] = name; SD[i, s] = desc
+      if (!(name in TOWS)) TOWS[name] = n
+      else if (index(" " TOWS[name] " ", " " n " ") == 0) TOWS[name] = TOWS[name] " " n
+      STEP[name]++
+    } else { WW[i, ++NWW[i]] = "a step line could not be read: " l; W_N++ }
+  }
+  close(f)
+  NS[i] = s
+  if (!s) { WW[i, ++NWW[i]] = "Its steps could not be read."; W_N++ }
+}
+function warn(t) { return "<p class=\"warning\">Warning: " esc(t) "</p>\n" }
+function ago(n,   d) {
+  if (!(n in LAST)) return ""
+  d = NOW - LAST[n]
+  if (d < 3600) { d = int(d / 60); return (d < 1 ? 1 : d) " min" }
+  if (d < 86400) return int(d / 3600) " h"
+  return int(d / 86400) " d"
+}
+function unchecked(n) {
+  return FORGE != "full" && !(n in OPEN) && !(n in ARCH)
+}
+function label(s) { return (s == "flight") ? "in flight" : s }
+function cls(s) { return (s == "recorded") ? "" : s }
+function row(n, desc, unplaced,   s, x, m) {
+  s = status(n)
+  x = "<span class=\"name\">" esc(n) "</span>"
+  if (n in STAGE) x = x "<span class=\"stage-inline\">" esc(STAGE[n]) "</span>"
+  if ((n in EPRI) && EPRI[n] != "normal") x = x "<span class=\"tag\">" esc(EPRI[n]) "</span>"
+  if (unplaced) x = x "<span class=\"tag\">unplaced</span>"
+  if (unchecked(n) || ((n in STAGE) && FORGE != "full")) x = x "<span class=\"mark\">merge not checked</span>"
+  if (desc != "") x = x "<p class=\"desc\">" inline(desc) "</p>"
+  if (n in ESUM) x = x "<p class=\"desc\">" inline(ESUM[n]) "</p>"
+  if (n in EWAIT && EWAIT[n] != "") x = x "<p class=\"desc\">Waits on " esc(EWAIT[n]) "</p>"
+  if (n in NOTE) x = x "<p class=\"desc\">Names " esc(NOTE[n]) ", which is not open</p>"
+  if (n in ENOFM) x = x warn("no frontmatter")
+  if ((n in STEP) && STEP[n] > 1) x = x warn("also a step of another workstream")
+  m = "<span class=\"st " cls(s) "\">" label(s) "</span><div>" x "</div><span class=\"ago\">" ago(n) "</span>"
+  if (n in EBODY)
+    return "<li class=\"step\"><details class=\"task\"><summary>" m "<span class=\"more\"></span></summary>\n" EBODY[n] "</details></li>\n"
+  return "<li class=\"step rowgrid\">" m "<span></span></li>\n"
+}
+function head() {
+  return "<li class=\"rowgrid rowhead\"><span>Status</span><span>Task</span><span>Last commit</span><span>Details</span></li>\n"
+}
+function group(i,   n, j, o, bar, d, f, x, m, q) {
+  n = WN[i]; d = 0; f = 0; bar = ""; o = ""; q = ""
+  for (j = 1; j <= NWW[i]; j++) q = q warn(WW[i, j])
+  for (j = 1; j <= NS[i]; j++) {
+    x = status(SN[i, j]); bar = bar "<u class=\"" cls(x) "\"></u>"
+    if (x == "done") d++
+    if (x == "flight") f++
+    o = o row(SN[i, j], SD[i, j], 0)
+  }
+  for (j = 1; j <= NX[i]; j++) {
+    if (status(XN[i, j]) == "flight") f++
+    o = o row(XN[i, j], "", 1)
+  }
+  m = d " of " NS[i] " done"
+  if (f) m = m ", " f " in work"
+  return "<details class=\"group\" id=\"" esc(n) "\"><summary><span class=\"chev\" aria-hidden=\"true\">▶</span><div><div class=\"name\">" esc(n) "</div>" \
+    ((i in WSUM) ? "<div class=\"sub\">" inline(WSUM[i]) "</div>" : "") \
+    "</div><div class=\"progress\"><div class=\"bar\">" bar "</div><span>" m "</span></div></summary>\n<div class=\"body\">\n" \
+    "<p class=\"def\"><strong>Goal:</strong> " inline(GOAL[i]) "</p>\n<p class=\"def\"><strong>Done when:</strong> " inline(DONEW[i]) "</p>\n" \
+    q "<ol class=\"steps\">\n" head() o "</ol>\n</div></details>\n"
+}
+function links(n,   a, c, i, o) {
+  o = ""
+  if (n in TOWS) { c = split(TOWS[n], a, " "); for (i = 1; i <= c; i++) o = o "<a href=\"#" esc(a[i]) "\">" esc(a[i]) "</a>" }
+  else if (n in PLACED) o = "<a href=\"#" esc(PLACED[n]) "\">" esc(PLACED[n]) "</a>"
+  return o
+}
+function flightrow(n,   s, t, p, l, q) {
+  s = STAGE[n]; t = ""
+  if (n in STEP) t = t "<span class=\"tag\">step</span>"
+  if (n in ENT) t = t "<span class=\"tag\">entry</span>"
+  if (CHG[n] == "yes") t = t "<span class=\"tag\">change</span>"
+  if (n in BR) t = t "<span class=\"tag\">branch</span>"
+  if (n in PRO) t = t "<span class=\"tag\">open PR</span>"
+  if (n in PRM) t = t "<span class=\"tag\">merged PR</span>"
+  if ((n in PLACED) && !(n in STEP)) t = t "<span class=\"tag\">unplaced</span>"
+  p = (s ~ /^plan/) ? "<i class=\"on\"></i><i></i><i></i>" : (s ~ /^build/) ? "<i class=\"past\"></i><i class=\"on\"></i><i></i>" : (s ~ /^ship/) ? "<i class=\"past\"></i><i class=\"past\"></i><i class=\"on\"></i>" : "<i></i><i></i><i></i>"
+  q = (FORGE != "full") ? "<span class=\"mark\">pull requests not checked</span>" : ""
+  l = links(n)
+  return "<div class=\"work\"><div><div class=\"name\">" esc(n) "</div>" \
+    ((n in ESUM) ? "<div class=\"sub\">" inline(ESUM[n]) "</div>" : "") \
+    "<div class=\"tags\">" t "</div></div><div><div class=\"pipe\">" p "</div><span class=\"stage\">" esc(s) "</span>" q "</div>" \
+    "<div class=\"ago\">" ago(n) "</div>" \
+    ((l != "") ? "<div class=\"ws\">" l "</div>" : "<div class=\"ws none\">no workstream</div>") "</div>\n"
+}
+function later(a, b,   x, y) {   # a sorts after b, newest first
+  x = (a in LAST) ? LAST[a] + 0 : 0; y = (b in LAST) ? LAST[b] + 0 : 0
+  if (x != y) return x < y
+  return a > b
+}
+function looser(a, b,   x, y) {   # a sorts after b in the group of tasks in no workstream
+  x = (status(a) == "flight") ? 0 : ((a in EPRI) && EPRI[a] == "parked") ? 2 : 1
+  y = (status(b) == "flight") ? 0 : ((b in EPRI) && EPRI[b] == "parked") ? 2 : 1
+  if (x != y) return x > y
+  return later(a, b)
+}
+function place(n,   pw, ew, w, x) {
+  if (n in SEEN) return
+  SEEN[n] = 1
+  if (n in STEP) return
+  pw = (n in PROP) ? PROP[n] : ""
+  ew = (n in EWS) ? EWS[n] : ""
+  w = (pw in WSI) ? pw : (ew in WSI) ? ew : ""
+  if (w != "") { PLACED[n] = w; x = WSI[w]; XN[x, ++NX[x]] = n; return }
+  if (pw != "") NOTE[n] = pw
+  else if (ew != "") NOTE[n] = ew
+  LOOSE[++NL] = n
+}
+function isort(a, c, how,   i, j, v, after) {
+  for (i = 2; i <= c; i++) {
+    v = a[i]; j = i - 1
+    while (j >= 1) {
+      after = (how == "new") ? later(a[j], v) : (how == "name") ? (a[j] > v) : looser(a[j], v)
+      if (!after) break
+      a[j + 1] = a[j]; j--
+    }
+    a[j + 1] = v
+  }
+}
+function loadlist(file, a,   l, c) {
+  c = 0
+  while ((getline l < file) > 0) a[++c] = l
+  close(file)
+  return c
+}
+function jstr(s,   o, i, c, n) {
+  if (s !~ /[\001-\037"\\]/) return "\"" s "\""
+  o = ""; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1)
+    if (c == "\"" || c == "\\") o = o "\\" c
+    else if (c == "\n") o = o "\\n"
+    else if (c == "\t") o = o "\\t"
+    else if (c == "\r") o = o "\\r"
+    else if (c in CTRL) o = o CTRL[c]
+    else o = o c
+  }
+  return "\"" o "\""
+}
+function jlist(a, c,   i, o) {
+  o = ""
+  for (i = 1; i <= c; i++) o = o (i > 1 ? "," : "") jstr(a[i])
+  return "[" o "]"
+}
+function jbool(v) { return v ? "true" : "false" }
+function jtask(n,   s, p, c, w, cw, g, cg, i, t) {
+  s = status(n)
+  c = 0
+  if (n in STEP) p[++c] = "step"
+  if (n in ENT) p[++c] = "entry"
+  if ((n in OPEN) || CHG[n] == "yes") p[++c] = "change"
+  if (n in ARCH) p[++c] = "archived_change"
+  if (n in BR) p[++c] = "branch"
+  if (n in PRO) p[++c] = "open_pr"
+  if (n in PRM) p[++c] = "merged_pr"
+  if (n in TOWS) cg = split(TOWS[n], g, " ")
+  else if (n in PLACED) { g[1] = PLACED[n]; cg = 1 }
+  else cg = 0
+  cw = 0
+  if (n in EWAIT) {
+    t = EWAIT[n]; gsub(/,/, " ", t); cw = split(t, w, " ")
+  }
+  return "{\"name\":" jstr(n) \
+    ",\"status\":" jstr((s == "flight") ? "in_flight" : s) \
+    ",\"stage\":" ((n in STAGE) ? jstr(STAGE[n]) : "null") \
+    ",\"workstreams\":" jlist(g, cg) \
+    ",\"unplaced\":" jbool((n in PLACED) && !(n in STEP)) \
+    ",\"closed_workstream\":" ((n in NOTE) ? jstr(NOTE[n]) : "null") \
+    ",\"parts\":" jlist(p, c) \
+    ",\"last_commit\":" ((n in LAST) ? LAST[n] + 0 : "null") \
+    ",\"summary\":" ((n in ESUM) ? jstr(ESUM[n]) : "null") \
+    ",\"priority\":" (((n in EPRI) && EPRI[n] != "normal") ? jstr(EPRI[n]) : "null") \
+    ",\"waits_on\":" jlist(w, cw) \
+    ",\"body\":" ((n in ERAW) ? jstr(ERAW[n]) : "null") \
+    ",\"merge_unchecked\":" jbool(unchecked(n) || ((n in STAGE) && FORGE != "full")) \
+    ",\"warnings\":" ((n in ENOFM) ? "[\"no frontmatter\"]" : "[]") "}"
+}
+function jws(i,   j, s, w, c, t) {
+  s = ""
+  for (j = 1; j <= NS[i]; j++) s = s (j > 1 ? "," : "") "{\"name\":" jstr(SN[i, j]) ",\"description\":" jstr(SD[i, j]) "}"
+  c = 0
+  for (j = 1; j <= NWW[i]; j++) w[++c] = WW[i, j]
+  for (j = 1; j <= NS[i]; j++) if (STEP[SN[i, j]] > 1) w[++c] = SN[i, j] " is also a step of another workstream"
+  return "{\"name\":" jstr(WN[i]) ",\"summary\":" ((i in WSUM) ? jstr(WSUM[i]) : "null") ",\"goal\":" jstr(GOAL[i]) \
+    ",\"done_when\":" jstr(DONEW[i]) ",\"active\":" jbool(ACTIVE[i]) ",\"steps\":[" s "],\"warnings\":" jlist(w, c) "}"
+}
+function document(   i, c, n, seen, list, o) {
+  for (i = 1; i < 32; i++) CTRL[sprintf("%c", i)] = sprintf("\\u%04x", i)
+  c = 0
+  for (n in STEP) if (!(n in seen)) { seen[n] = 1; list[++c] = n }
+  for (n in SEEN) if (!(n in seen)) { seen[n] = 1; list[++c] = n }
+  isort(list, c, "name")
+  printf "{\"schema_version\":1,\"project\":%s,\"written_at\":%s,", jstr(ENVIRON["TB_PROJECT"]), jstr(ENVIRON["TB_UTC"])
+  printf "\"trunk\":{\"ref\":%s,\"branch\":%s,\"commit\":%s,\"state\":%s},", jstr(ENVIRON["TB_TRUNK"]), jstr(ENVIRON["TB_TRUNK_NAME"]), jstr(ENVIRON["TB_SHA"]), jstr(ENVIRON["TB_STATE"])
+  printf "\"remote_branches_read\":%s,\"forge\":%s,\"forge_limit\":%d,\"warnings\":%d,\"workstreams\":[", ENVIRON["TB_REMOTE_READ"], jstr(FORGE), ENVIRON["TB_LIMIT"] + 0, W_N + 0
+  for (i = 1; i <= NW; i++) printf "%s%s", (i > 1 ? "," : ""), jws(i)
+  printf "],\"tasks\":["
+  for (i = 1; i <= c; i++) printf "%s%s", (i > 1 ? "," : ""), jtask(list[i])
+  print "]}"
+}
+function copy(file,   l) { while ((getline l < file) > 0) print l; close(file) }
+BEGIN {
+  sets()
+  FORGE = ENVIRON["TB_FORGE"]; NOW = ENVIRON["TB_NOW"] + 0
+  tsv(W "/last-trunk", "last"); tsv(W "/last-branch", "last")
+  FL = 0; tsv(W "/flight-info", "flight")
+  NW = loadlist(W "/workstreams", WN)
+  for (i = 1; i <= NW; i++) { WSI[WN[i]] = i; NX[i] = 0 }
+  for (i = 1; i <= NW; i++) read_ws(i, WN[i])
+  c = loadlist(W "/entries", EL)
+  for (i = 1; i <= c; i++) read_entry(EL[i])
+  NL = 0
+  for (i = 1; i <= c; i++) place(EL[i])
+  c = loadlist(W "/open", OL)
+  for (i = 1; i <= c; i++) place(OL[i])
+  for (i = 1; i <= FL; i++) place(FLIGHT[i])
+  isort(LOOSE, NL, "loose")
+  isort(FLIGHT, FL, "new")
+  for (i = 1; i <= NW; i++) {
+    act = 0
+    for (j = 1; j <= NS[i]; j++) if (status(SN[i, j]) == "flight") act = 1
+    for (j = 1; j <= NX[i]; j++) if (status(XN[i, j]) == "flight") act = 1
+    ACTIVE[i] = act
+  }
+  for (i = 1; i <= NW; i++) for (j = 1; j <= NS[i]; j++) if (STEP[SN[i, j]] > 1) W_N++
+  if (ENVIRON["TB_FORMAT"] == "json") {
+    document()
+    print W_N + 0 > (W "/warnings")
+    exit
+  }
+  a = ""; o = ""; na = 0; no = 0
+  for (i = 1; i <= NW; i++) {
+    g_ = group(i)
+    if (ACTIVE[i]) { a = a g_; na++ } else { o = o g_; no++ }
+  }
+  p = esc(ENVIRON["TB_PROJECT"])
+  print "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+  print "<title>" p " tasks</title>\n<style>"
+  copy(W "/style.css")
+  print "</style></head><body><main>"
+  print "<header><h1>" p "</h1><p class=\"meta\">Written " esc(ENVIRON["TB_WHEN"]) ", from " esc(ENVIRON["TB_TRUNK"]) " " esc(ENVIRON["TB_SHA"]) ".</p></header>"
+  n = ENVIRON["TB_NOTICES"]
+  if (n != "") { c = split(n, nt, "|"); print "<div class=\"notice\">"; for (i = 1; i <= c; i++) print "<span>" esc(nt[i]) "</span>"; print "</div>" }
+  print "<section><h2>In work (" FL ")</h2>"
+  if (FL) {
+    print "<div class=\"list\"><div class=\"work workhead\"><span>Task</span><span>Stage</span><span>Last commit</span><span>Workstream</span></div>"
+    for (i = 1; i <= FL; i++) printf "%s", flightrow(FLIGHT[i])
+    print "</div>"
+  } else print "<p class=\"meta\">Nothing is in flight.</p>"
+  print "<p class=\"meta\">A session's own status report is finer than these stages.</p></section>"
+  if (NW) {
+    print "<section><h2>Active workstreams (" na ")</h2>"
+    if (na) printf "<div class=\"groups\">\n%s</div>\n", a
+    else print "<p class=\"meta\">No workstream is active.</p>"
+    print "<div class=\"legend\"><span class=\"st done\">done</span><span class=\"st flight\">in flight</span><span class=\"st\">recorded</span><span class=\"st planned\">planned</span></div></section>"
+  }
+  if (no) {
+    print "<section><h2>Other workstreams (" no ")</h2><details class=\"group\"><summary><span class=\"chev\" aria-hidden=\"true\">▶</span><div><div class=\"name\">" no " workstream" (no == 1 ? "" : "s") "</div><div class=\"sub\">Nothing in work right now</div></div><span></span></summary>"
+    printf "<div class=\"body\"><div class=\"groups\">\n%s</div></div></details></section>\n", o
+  }
+  if (NL) {
+    print "<section><h2>Not in a workstream</h2><details class=\"group\"" (NW ? "" : " open") "><summary><span class=\"chev\" aria-hidden=\"true\">▶</span><div><div class=\"name\">" NL " task" (NL == 1 ? "" : "s") "</div></div><span></span></summary>"
+    print "<div class=\"body\"><ul class=\"steps\">"
+    printf "%s", head()
+    for (i = 1; i <= NL; i++) printf "%s", row(LOOSE[i], "", 0)
+    print "</ul></div></details></section>"
+  }
+  print "</main></body></html>"
+  print W_N + 0 > (W "/warnings")
+}
+AWK
+
+SHA="$(g rev-parse --short "$TRUNK")"
+NOTICES=""
+notice() { NOTICES="${NOTICES:+$NOTICES|}$1"; }
+if [ "$HAS_ORIGIN" = no ]; then
+  TRUNK_LINE="$TRUNK_NAME $SHA, the current branch: no remote named origin"
+  notice "No remote named origin: read the current branch, $TRUNK_NAME."
+elif [ "$FETCHED" = yes ]; then
+  TRUNK_LINE="$TRUNK $SHA, fetched"
+else
+  TRUNK_LINE="$TRUNK $SHA, the fetch failed and it may be stale"
+  notice "The trunk may be stale: the fetch failed."
+fi
+if [ "$REMOTE_READ" = yes ]; then
+  REMOTE_LINE="read"
+else
+  REMOTE_LINE="not read"
+  notice "Remote branches not read."
+fi
+case "$FORGE" in
+  full) FORGE_LINE="read in full" ;;
+  partly)
+    FORGE_LINE="partly read, the first $PR_LIMIT pull requests"
+    notice "Forge partly read: the first $PR_LIMIT pull requests." ;;
+  *)
+    FORGE_LINE="not reached"
+    notice "Forge not reached: merged pull requests could not be checked." ;;
+esac
+
+TB_NOW="$(date +%s)"
+TB_WHEN="$(date '+%Y-%m-%d %H:%M')"
+TB_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+TB_STATE=fetched
+if [ "$HAS_ORIGIN" = no ]; then TB_STATE=no_origin; elif [ "$FETCHED" = no ]; then TB_STATE=fetch_failed; fi
+TB_REMOTE_READ=false
+if [ "$REMOTE_READ" = yes ]; then TB_REMOTE_READ=true; fi
+export TB_NOTICES="$NOTICES" TB_SHA="$SHA" TB_NOW TB_WHEN TB_UTC TB_STATE TB_REMOTE_READ
+export TB_TRUNK_NAME="$TRUNK_NAME" TB_LIMIT="$PR_LIMIT"
+
+write_failed() {
+  echo "Outcome: ERROR"
+  echo "Reason: ${OUTPUT:-the document} could not be written"
+  [ -s "$WORK/errors" ] && head -n 3 "$WORK/errors"
+  exit 1
+}
+
+if [ "$JSON" = yes ]; then
+  # Written whole first, so a failed run leaves standard output empty.
+  TB_FORMAT=json awk -f "$WORK/common.awk" -f "$WORK/board.awk" > "$WORK/document" 2>"$WORK/errors" </dev/null || write_failed
+  # awk cannot be relied on to hold or escape a NUL, and no JSON text holds one.
+  tr -d '\000' < "$WORK/document" >&3 || write_failed
+else
+  if [ -d "$OUTPUT" ]; then write_failed; fi
+  PAGE_TMP="$OUTPUT.$$.tmp"
+  { : > "$PAGE_TMP"; } 2>/dev/null || write_failed
+  awk -f "$WORK/common.awk" -f "$WORK/board.awk" > "$PAGE_TMP" 2>"$WORK/errors" </dev/null || write_failed
+  mv -f "$PAGE_TMP" "$OUTPUT" 2>/dev/null || write_failed
+  PAGE_TMP=""
+  echo "Board: $OUTPUT"
+fi
+
+echo "Trunk: $TRUNK_LINE"
+echo "Remote branches: $REMOTE_LINE"
+echo "Forge: $FORGE_LINE"
+echo "Warnings: $(cat "$WORK/warnings")"
+echo "Outcome: SUCCESS"

@@ -1,0 +1,44 @@
+{
+	"name": "dev-task-board",
+	"version": "0.1.0",
+	"description": "A local board of development tasks, read from your Git repositories.",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Shatynska-Labs/dev-task-board.git"
+	},
+	"bin": {
+		"dev-task-board": "dist/cli.js"
+	},
+	"files": [
+		"dist/",
+		"vendor/"
+	],
+	"os": [
+		"linux",
+		"darwin"
+	],
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"check": "biome ci .",
+		"check:package": "vitest run tests/package.test.ts",
+		"prepack": "npm run build",
+		"prepare": "simple-git-hooks",
+		"test": "vitest run --exclude tests/package.test.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.4",
+		"@types/node": "^24.19.2",
+		"simple-git-hooks": "^2.14.0",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.5"
+	},
+	"simple-git-hooks": {
+		"pre-commit": "npm exec --no -- biome ci .",
+		"pre-push": "npm run typecheck && npm test"
+	}
+}

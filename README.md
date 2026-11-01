@@ -53,3 +53,15 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 - **Requirements**: at start the tool checks for `bash`, `git` and `awk` and refuses to run with a clear message where one is missing. `gh` stays optional, as `--json` allows.
 
 <!-- /ai-toolkit:project-foundation -->
+
+## Status
+
+It does nothing useful yet: `npx dev-task-board --version` prints its version, and the board arrives through the workstream `see-my-projects-live`.
+
+## Development
+
+Run `npm ci` in every checkout, on a machine with `git`, `bash` and `awk`, and Node from `.nvmrc`. It installs the local hooks.
+
+- `npm test`, `npm run typecheck`, `npm run build`
+- `npx biome ci .`
+- `npm run check:package`, which the gate runs on its own
