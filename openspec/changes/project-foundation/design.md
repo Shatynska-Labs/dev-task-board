@@ -1,6 +1,6 @@
 ## Identity
 
-- **What it is**: a local board of development tasks, read from your Git repositories. It runs on your machine and is kept open in a browser tab.
+- **What it is**: a local board of development tasks, read from your Git repositories. It runs on your machine and is kept open in a browser tab. A **workstream** is a goal that takes more than one change. The board shows changes, backlog entries and workstreams as one view of a project's tasks, and works in a project with no workstreams.
 - **Problem it solves**: a project's tasks are spread across its workstreams, its backlog, its changes, its branches and its pull requests. Working in parallel sessions across several projects, the picture is held in memory, and a page generated once goes stale at once.
 - **Intended audience**: a developer working with the `ai-toolkit` workflow's conventions: `docs/workstreams/`, `docs/backlog/` and OpenSpec changes, and whoever they share that way of working with. Its first user is the operator.
 
