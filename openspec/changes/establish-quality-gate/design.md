@@ -44,4 +44,4 @@ Merge, then the operator publishes once from a clean `main` and sets the trusted
 
 ## Open Questions
 
-- The licence. The operator has not chosen one, so `package.json` names none, and they settle it before the first publish.
+None. The operator chose the MIT licence on 2026-11-01, before the first publish.
