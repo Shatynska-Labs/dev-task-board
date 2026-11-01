@@ -8,9 +8,9 @@ The project has decisions and no quality layer, so no later change has a gate to
 
 ## What it must build
 
-Every item is recorded in `AGENTS.md`, `## Testing Strategy` and `## Development Tooling`. Read them there, not in `project-foundation`'s `design.md`, which moves into the archive.
+Every item is recorded in `AGENTS.md`, `## Testing Strategy` and `## Development Tooling`, but for the carried tool, which `README.md`'s Technology records. Read them there, not in `project-foundation`'s `design.md`, which moves into the archive.
 
-- The `package.json`, with `bin`, `engines`, `files` and `os`, `tsconfig.json` and a lock file; the test runner, Vitest, with `npm test`; `.nvmrc`.
+- The `package.json`, with `bin`, `engines`, `files` and `os`, `tsconfig.json` and a lock file; the test runner, Vitest, with `npm test`, and at least one real test, since Vitest fails with none and `--passWithNoTests` would be a skip the gate does not allow; `.nvmrc`.
 - Biome for linting and formatting; `tsc --noEmit` with `strict`; the build to `dist/`, with enough of an entry point for `bin` and the build to work.
 - `vendor/task-board`, copied from `ai-toolkit`'s `scripts/task-board`, and `vendor/task-board.source` with its commit, as `README.md`'s Technology records. The package check needs them.
 - Local hooks, as a mirror of the gate.
