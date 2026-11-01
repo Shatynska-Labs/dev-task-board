@@ -144,3 +144,32 @@ Such a branch is created and left: it takes no working tree and does not become 
 
 **Markdown prose.** Do not hard-wrap prose. Keep each paragraph on a single line whatever its length. Use a line break only where Markdown's own structure requires one.
 <!-- /ai-toolkit:development-workflow-direct -->
+
+<!-- ai-toolkit:project-foundation -->
+## Testing Strategy
+
+Vitest, for its TypeScript support with no build step. Unit tests cover settings and rendering from document fixtures; integration tests run the server against fixture Git repositories and the carried tool, with a stub `gh` on `PATH`.
+
+- **Test command**: `npm test`
+- **Test-path glob**: `tests/**/*.test.ts`
+- **Shared test arrangement**: `tests/support/`
+
+## Development Tooling
+
+- **Linting**: Biome.
+- **Formatting**: Biome, enforced in the gate.
+- **Type checking**: `tsc --noEmit` with `strict`.
+- **Build tooling**: `tsc` to `dist/`, published as the npm package `dev-task-board` with a `bin`, run by `npx dev-task-board`. `files` lists `dist/` and `vendor/`, and `os` lists `linux` and `darwin`. A GitHub Actions workflow publishes with npm trusted publishing when a merge to `main` raises the version in `package.json`, so after the first publish, which only the operator does, nothing ships from a local machine. That publish is this project's deploy; a merge that leaves the version alone deploys nothing. Confirming a release means running `npx dev-task-board@<version>`. A change with a user-visible effect raises the version, so there is a release to confirm. The first publish is the operator's, once, since a trusted publisher can only be set on a package that exists.
+- **Local hooks**: `simple-git-hooks`: Biome before a commit, type check and tests before a push, as a fast mirror of the gate and never a gate. No stand-down for any class of change.
+- **Commit messages**: Conventional Commits, unchecked, as `ai-toolkit` writes them.
+- **Pull requests**: the `commits-and-pull-requests` skill's form, with no template and no check.
+- **Secrets**: the project holds none: publishing uses trusted publishing, with no stored token. `gh` keeps its own credentials, and the settings file holds account names, never tokens. The ignore file keeps `.env` files out.
+- **Dependency updates and audit**: Dependabot weekly for npm and Actions, and `npm audit --audit-level=high` in the gate.
+- **Continuous integration**: GitHub Actions on every pull request, on Ubuntu and macOS, so bash 3.2 and BSD awk are exercised: Biome, type check, tests, build, audit and a check that the package holds `dist/` and `vendor/`. It is the authority and fails rather than skips: a missing `git`, `bash` or `awk` fails the run. `gh` is stubbed in tests, so its absence is not a failure.
+- **Toolchain pinning**: `.nvmrc` at Node 24, `engines` in `package.json`, and a committed `package-lock.json` with `npm ci`.
+- **Branch protection**: the gate required, changes reach `main` only through pull requests, administrators bound. Applied by the successor once the checks have reported, on the operator's confirmation.
+- **Provisioning**: `npm ci`, on a machine with `git`, `bash` and `awk`. Vitest and Biome exclude `.worktrees/` and `.claude/worktrees/` by configuration, whether or not the ignore file names them.
+- **Ignore entries**: `node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`, `.npmrc`.
+- **Delivery**: the successor `establish-quality-gate` owns every item above but the ignore entries.
+
+<!-- /ai-toolkit:project-foundation -->

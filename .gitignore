@@ -14,3 +14,10 @@ Thumbs.db
 # Working trees
 .worktrees/
 .claude/worktrees/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.npmrc
