@@ -30,3 +30,5 @@
 - [ ] 5.1 The operator publishes once from a clean, provisioned `main`, on their own confirmation
 - [ ] 5.2 The operator sets the trusted publisher: repository `Shatynska-Labs/dev-task-board`, workflow `release.yml`
 - [ ] 5.3 Verify `npx dev-task-board@0.1.0 --version` prints `0.1.0`, and that the release workflow's run on `main` published nothing, and that GitHub reports no error for the Dependabot configuration
+
+**Specs already synced**: `show-a-workspace`'s archive synced this change's `package` and `release` deltas on 2026-11-01. Archive this change without syncing them again: `show-a-workspace` has since replaced part of `package`.

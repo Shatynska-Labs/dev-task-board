@@ -44,7 +44,7 @@ None: nothing has been published. Rollback is a revert.
 
 ## Sequence
 
-`establish-quality-gate` is not archived, since its archive waits on the first publish, so `package` is not yet in `openspec/specs/`. This change's delta to `package` applies only once that archive has synced it, so this change's archive comes after that one. This change's merge does not wait for it.
+`establish-quality-gate` is not archived, since its archive waits on the first publish, so `package` is not yet in `openspec/specs/`. The operator asked to archive this change first, so `establish-quality-gate`'s `package` and `release` deltas were synced to `openspec/specs/` ahead of its archive, its code being on the trunk. This change's delta to `package` applied on top.
 
 The operator's first publish stays `0.1.0`, as `establish-quality-gate` confirms. Where this has merged by then, they publish from `c03351a`, the commit before it, rather than from `main`. `release.yml` gains `workflow_dispatch`, so `0.2.0` can then be published by running the workflow once the trusted publisher is set, with no further push to `main`.
 

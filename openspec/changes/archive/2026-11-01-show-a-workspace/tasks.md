@@ -17,3 +17,5 @@
 - [x] 4.1 Pin `@types/node` to 24 with a Dependabot `ignore`, and verify `npm run typecheck`
 - [x] 4.2 Raise the version to `0.2.0`, add `workflow_dispatch` to `release.yml`, and say in `README.md`'s Status and Running it how to write the settings, where they live, how to start the board, and that `github_account` is refused until `switch-between-workspaces`
 - [x] 4.3 Run it against this project, `ai-toolkit` and `basis`, and verify each page's task count equals `--json`'s
+
+**Confirmed** by the operator on 2026-11-01, on the running board with `commerce-ops`, after the layout fix in #7.
