@@ -212,3 +212,11 @@ Written at `apply`, against the promotion list above.
 ## Task 4.3's run
 
 With temporary settings naming the three projects, `gh` logged in, on 2026-11-01: `dev-task-board` 6 tasks, 2 in flight; `ai-toolkit` 30 tasks, 1 in flight; `basis` 13 tasks, 0 in flight. Each equals `--json`, every task's name was on its page, `forge` was `full`, a `Host` of `evil.example` got 403, and `SIGINT` exited zero.
+
+## Recorded changes to derived assertions
+
+- `tests/render.test.ts`, `takes a workstream's activity from active, not from its tasks`: it now compares the two names after the `Active workstreams` heading, not across the page. In work rows name their workstream, as the accepted page's do, so the first mention on the page is no longer the section's.
+
+## Tests added by the layout fix
+
+`The accepted layout` in `tests/render.test.ts` holds what the first merge lacked: In work with nothing in flight, age from `written_at`, the stage pipe, unplaced work in progress, the order of tasks in no workstream, and an in-flight row's summary, tag and forge mark. The markup itself stays untested, since no spec states it.
