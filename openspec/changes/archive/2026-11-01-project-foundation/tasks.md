@@ -6,3 +6,5 @@
 - [x] 1.4 Open `establish-quality-gate` with a committed `handoff.md` on its own branch, and verify the branch holds it
 
 This change is exempt from test authoring: its test command and test-path glob are among its own outputs. The exemption is this change's alone.
+
+**Confirmation waived** by the operator on 2026-11-01: no observation can be made, since the change is documentation and ignore entries with no behaviour. Its successor is on the branch `establish-quality-gate`.
