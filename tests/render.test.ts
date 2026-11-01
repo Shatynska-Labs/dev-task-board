@@ -501,6 +501,113 @@ describe("A project's page shows its document", () => {
 	});
 });
 
+describe("The accepted layout", () => {
+	it("says so where nothing is in flight", () => {
+		const text = textOf(page(fullDocument({ tasks: [task("loose-task")] })));
+
+		expect(text).toContain("In work (0)");
+		expect(text).toContain("Nothing is in flight.");
+	});
+
+	it("takes a task's age from written_at", () => {
+		const writtenAt = "2026-11-01T22:00:00Z";
+		const twoHours = Date.parse(writtenAt) / 1000 - 2 * 3600;
+		const threeDays = Date.parse(writtenAt) / 1000 - 3 * 86400;
+		const text = textOf(
+			page(
+				fullDocument({
+					written_at: writtenAt,
+					tasks: [
+						task("recent", { last_commit: twoHours }),
+						task("older", { last_commit: threeDays }),
+					],
+				}),
+			),
+		);
+
+		expect(text).toMatch(/recent.*2 h/);
+		expect(text).toMatch(/older.*3 d/);
+	});
+
+	it.each([
+		["plan:drafting", '<i class="on"></i><i></i><i></i>'],
+		["build:applying", '<i class="past"></i><i class="on"></i><i></i>'],
+		[
+			"ship:merged",
+			'<i class="past"></i><i class="past"></i><i class="on"></i>',
+		],
+		["unknown", "<i></i><i></i><i></i>"],
+	])("lights the stages of %s", (stage, lit) => {
+		const html = page(
+			fullDocument({ tasks: [task("flying", { status: "in_flight", stage })] }),
+		);
+
+		expect(html).toContain(lit);
+	});
+
+	it("counts an unplaced task in flight as work in its workstream", () => {
+		const text = textOf(
+			page(
+				fullDocument({
+					workstreams: [workstream("goal", true, ["a-step", "b-step"])],
+					tasks: [
+						task("a-step", { workstreams: ["goal"] }),
+						task("b-step", { workstreams: ["goal"] }),
+						task("stray", {
+							status: "in_flight",
+							workstreams: ["goal"],
+							unplaced: true,
+						}),
+					],
+				}),
+			),
+		);
+
+		expect(text).toContain("0 of 2 done, 1 in work");
+	});
+
+	it("orders tasks in no workstream in flight first and parked last", () => {
+		const text = textOf(
+			page(
+				fullDocument({
+					tasks: [
+						task("a-parked", { priority: "parked", last_commit: 9 }),
+						task("b-older", { last_commit: 1 }),
+						task("c-newer", { last_commit: 2 }),
+					],
+				}),
+			),
+		);
+
+		expectInOrder(text, ["c-newer", "b-older", "a-parked"]);
+	});
+
+	it("shows an in-flight task's summary, unplaced tag and unchecked forge", () => {
+		const text = textOf(
+			page(
+				fullDocument({
+					forge: "none",
+					workstreams: [workstream("goal", true, [])],
+					tasks: [
+						task("flying", {
+							status: "in_flight",
+							stage: "plan:drafting",
+							summary: "what it does",
+							workstreams: ["goal"],
+							unplaced: true,
+						}),
+					],
+				}),
+			),
+		);
+		const inWork = text.slice(0, text.indexOf("Active workstreams"));
+
+		expect(inWork).toContain("what it does");
+		expect(inWork).toContain("unplaced");
+		expect(inWork).toContain("pull requests not checked");
+	});
+});
+
 describe("A partial forge read is noticed", () => {
 	const notice = /statuses may be wrong/i;
 
@@ -558,6 +665,7 @@ describe("Document text is escaped", () => {
 				fullDocument({
 					project: raw,
 					written_at: raw,
+					trunk: { ref: raw, commit: raw },
 					workstreams: [
 						{
 							...workstream(raw, true, [raw]),
@@ -577,6 +685,15 @@ describe("Document text is escaped", () => {
 							closed_workstream: raw,
 						}),
 						task(`${raw}2`, { workstreams: [raw], unplaced: true }),
+						task(`${raw}3`, {
+							status: "in_flight",
+							stage: raw,
+							summary: raw,
+							workstreams: [raw],
+							parts: [raw],
+							waits_on: [raw],
+							warnings: [raw],
+						}),
 					],
 				}),
 			);
