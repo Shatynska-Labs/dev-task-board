@@ -119,7 +119,7 @@ function statusMark(status: string): string {
 
 function warnings(texts: string[] | undefined): string {
 	return (texts ?? [])
-		.map((text) => `<p class="warning">${escapeHtml(text)}</p>`)
+		.map((text) => `<p class="warning">Warning: ${escapeHtml(text)}</p>`)
 		.join("");
 }
 
@@ -152,9 +152,11 @@ function taskRow(
 ): string {
 	const marks = [
 		task.stage && `<span class="stage-inline">${escapeHtml(task.stage)}</span>`,
-		task.priority && `<span class="tag">${escapeHtml(task.priority)}</span>`,
-		task.merge_unchecked && '<span class="mark">merge unchecked</span>',
-		options.unplaced && '<span class="mark">unplaced</span>',
+		task.priority &&
+			task.priority !== "normal" &&
+			`<span class="tag">${escapeHtml(task.priority)}</span>`,
+		options.unplaced && '<span class="tag">unplaced</span>',
+		task.merge_unchecked && '<span class="mark">merge not checked</span>',
 	]
 		.filter(Boolean)
 		.join("");
@@ -171,9 +173,11 @@ function chevron(): string {
 	return '<span class="chev" aria-hidden="true">▶</span>';
 }
 
-function progress(steps: Task[]): string {
+function progress(steps: Task[], unplaced: Task[]): string {
 	const done = steps.filter((task) => task.status === "done").length;
-	const flying = steps.filter((task) => task.status === "in_flight").length;
+	const flying = [...steps, ...unplaced].filter(
+		(task) => task.status === "in_flight",
+	).length;
 	const bar = steps
 		.map((task) => `<u class="${statusClass(task.status)}"></u>`)
 		.join("");
@@ -189,12 +193,10 @@ function renderStream(stream: Stream, tasks: Task[], now: number): string {
 			? taskRow(task, now, { description: step.description })
 			: `<li class="step"><span class="name">${escapeHtml(step.name)}</span></li>\n`;
 	});
-	const unplaced = tasks
-		.filter(
-			(task) =>
-				!stepNames.has(task.name) && task.workstreams?.includes(stream.name),
-		)
-		.map((task) => taskRow(task, now, { unplaced: true }));
+	const unplaced = tasks.filter(
+		(task) =>
+			!stepNames.has(task.name) && task.workstreams?.includes(stream.name),
+	);
 	const stepTasks = stream.steps.flatMap((step) =>
 		tasks.filter((task) => task.name === step.name),
 	);
@@ -211,10 +213,10 @@ function renderStream(stream: Stream, tasks: Task[], now: number): string {
 	const summary = stream.summary
 		? `<div class="sub">${inline(stream.summary)}</div>`
 		: "";
-	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}</div>${progress(stepTasks)}</summary>
+	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}</div>${progress(stepTasks, unplaced)}</summary>
 <div class="body">
 ${about}${warnings(stream.warnings)}<ol class="steps">
-${ROW_HEAD}${[...rows, ...unplaced].join("")}</ol>
+${ROW_HEAD}${[...rows, ...unplaced.map((task) => taskRow(task, now, { unplaced: true }))].join("")}</ol>
 </div></details>
 `;
 }
@@ -229,19 +231,24 @@ function pipe(stage: string | null | undefined): string {
 	}).join("");
 }
 
-function workRow(task: Task, now: number): string {
-	const tags = (task.parts ?? [])
+function workRow(task: Task, now: number, partial: boolean): string {
+	const partTags = (task.parts ?? [])
 		.map(
 			(part) =>
 				`<span class="tag">${escapeHtml(part.replace("_", " ").replace(" pr", " PR"))}</span>`,
 		)
 		.join("");
+	const unplaced = task.unplaced ? '<span class="tag">unplaced</span>' : "";
+	const tags = partTags + unplaced;
+	const summary = task.summary
+		? `<div class="sub">${inline(task.summary)}</div>`
+		: "";
 	const streams = task.workstreams ?? [];
 	const stream =
 		streams.length > 0
 			? `<div class="ws">${streams.map((name) => `<a href="#${escapeHtml(encodeURIComponent(name))}">${escapeHtml(name)}</a>`).join("")}</div>`
 			: '<div class="ws none">no workstream</div>';
-	return `<div class="work"><div><div class="name">${escapeHtml(task.name)}</div><div class="tags">${tags}</div></div><div><div class="pipe">${pipe(task.stage)}</div><span class="stage">${escapeHtml(task.stage ?? "")}</span></div><div class="ago">${age(task, now)}</div>${stream}</div>
+	return `<div class="work"><div><div class="name">${escapeHtml(task.name)}</div>${summary}<div class="tags">${tags}</div></div><div><div class="pipe">${pipe(task.stage)}</div><span class="stage">${escapeHtml(task.stage ?? "")}</span>${partial ? '<span class="mark">pull requests not checked</span>' : ""}</div><div class="ago">${age(task, now)}</div>${stream}</div>
 `;
 }
 
@@ -252,6 +259,22 @@ function section(title: string, body: string): string {
 const LEGEND =
 	'<div class="legend"><span class="st done">done</span><span class="st flight">in flight</span><span class="st">recorded</span><span class="st planned">planned</span></div>';
 
+function looseRank(task: Task): number {
+	if (task.status === "in_flight") {
+		return 0;
+	}
+	return task.priority === "parked" ? 2 : 1;
+}
+
+// In flight first and parked last, as the accepted page orders them.
+function looseOrder(a: Task, b: Task): number {
+	return (
+		looseRank(a) - looseRank(b) ||
+		(b.last_commit ?? 0) - (a.last_commit ?? 0) ||
+		a.name.localeCompare(b.name)
+	);
+}
+
 function renderDocument(document: BoardDocument): string {
 	const tasks = document.tasks ?? [];
 	const streams = document.workstreams ?? [];
@@ -260,22 +283,25 @@ function renderDocument(document: BoardDocument): string {
 	const inWork = tasks
 		.filter((task) => task.status === "in_flight")
 		.sort((a, b) => (b.last_commit ?? 0) - (a.last_commit ?? 0));
-	const loose = tasks.filter(
-		(task) => !task.workstreams?.some((name) => known.has(name)),
-	);
+	const loose = tasks
+		.filter((task) => !task.workstreams?.some((name) => known.has(name)))
+		.sort(looseOrder);
 	const active = streams.filter((stream) => stream.active);
 	const other = streams.filter((stream) => !stream.active);
 	const groups = (list: Stream[]) =>
 		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
 	const parts: string[] = [];
-	if (inWork.length > 0) {
-		parts.push(
-			section(
-				`In work (${inWork.length})`,
-				`<div class="list"><div class="work workhead"><span>Task</span><span>Stage</span><span>Last commit</span><span>Workstream</span></div>\n${inWork.map((task) => workRow(task, now)).join("")}</div>\n<p class="meta">A session's own status report is finer than these stages.</p>`,
-			),
-		);
-	}
+	const partial = isPartial(document);
+	parts.push(
+		section(
+			`In work (${inWork.length})`,
+			`${
+				inWork.length > 0
+					? `<div class="list"><div class="work workhead"><span>Task</span><span>Stage</span><span>Last commit</span><span>Workstream</span></div>\n${inWork.map((task) => workRow(task, now, partial)).join("")}</div>`
+					: '<p class="meta">Nothing is in flight.</p>'
+			}\n<p class="meta">A session's own status report is finer than these stages.</p>`,
+		),
+	);
 	if (streams.length > 0) {
 		parts.push(
 			section(
