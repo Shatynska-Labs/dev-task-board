@@ -2,7 +2,7 @@
 
 This project has been initialized and holds no decisions yet: what it is, what it leaves out, and how it is built and verified. They come first because every later change's test author needs the test command, glob and shared arrangement this change settles. The reasoning behind the project is in `ai-toolkit`'s `docs/workstreams/see-a-projects-tasks.md`, decision 9.
 
-This change advances no workstream in this repository. It serves `see-a-projects-tasks` in `ai-toolkit`, which holds a workstream for the board's rules; a workstream of its own here can follow once there is more than one change to hold.
+This change advances no workstream in this repository. It serves `see-a-projects-tasks` in `ai-toolkit`. The application needs several changes, so a workstream here is proposed to the operator, to be opened with the plan of the first change that advances it.
 
 ## What Changes
 

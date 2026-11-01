@@ -29,14 +29,17 @@
 - **Node's own `node:http`, with no web framework.** There are a handful of routes and no state beyond a cache, and a public tool installed by others is better with few dependencies.
 - **Pages rendered on the server as HTML, with a small script** that refreshes the data and keeps opened rows open. No client framework: the accepted layout is plain markup with `<details>`, and the page stays readable with scripting off.
 - **`smol-toml`** for the settings file, the one runtime dependency.
-- **`scripts/task-board` carried as a pinned copy** in the package, so nothing depends on where `ai-toolkit` sits on a disk. It needs bash, git and awk, and `gh` where present.
+- **`scripts/task-board` carried as a pinned copy** at `vendor/task-board`, with its source commit in `vendor/task-board.source`, so nothing depends on where `ai-toolkit` sits on a disk. It stands alone, sourcing nothing, and runs through `bash`. Bumping it is a normal change, which `schema_version` guards.
+- **Platforms**: Linux, WSL and macOS, where bash, git and awk are ordinary. Windows outside WSL is not supported.
 
 ## Architecture
 
-- **Settings** at `~/.config/dev-task-board/config.toml`: `[workspaces.<name>]` with `projects` and an optional `github_account`. With no `github_account`, `gh` is used as it is logged in.
-- **Collector**: for each project, runs the carried tool with `--json`, checks `schema_version`, and caches the document in memory. It runs on a timer only while a tab has asked recently, one project at a time per workspace, so a refresh never waits on a read and nothing runs overnight.
-- **Server**: binds to `127.0.0.1` only. `/<workspace>` is the overview, `/<workspace>/<project>` a project, and `/api/...` the cached documents with their read time. With one workspace, `/` is that workspace.
-- **Failure**: a project that cannot be read keeps its last document, marked with its age and the reason. A `schema_version` it does not know is stated, never guessed at.
+- **Settings** at `~/.config/dev-task-board/config.toml`: `[workspaces.<name>]` with `projects`, a list of paths, and an optional `github_account`. A project's address is its directory's base name, and two of one name in a workspace are refused at start. `api` is reserved as a workspace name. With no `github_account`, `gh` is used as it is logged in; with one, its token from `gh auth token --user` goes in that read's environment alone, never stored or logged, so the user's active login does not change.
+- **Collector**: for each project, runs the carried tool with `--json`, checks `schema_version`, and caches the document in memory. Documents are cached per workspace and project. It runs on a timer, one project at a time per workspace, so a refresh never waits on a read. The page's script asks only while the page is visible, and the timer stops five minutes after the last request, so a hidden tab costs nothing. A read has a limit of 60 seconds, and passing it counts as a failure with that reason.
+- **Server**: binds to `127.0.0.1` only. The default port is 8766, so a pinned tab keeps its address. `/<workspace>` is the overview, `/<workspace>/<project>` a project, and `/api/...` the cached documents with their read time. With one workspace, `/` is that workspace; with several, it lists them. A request with an unexpected `Host` is refused, so a web page cannot reach it by DNS rebinding. All document text is escaped on render, since `--json` gives it as the repository holds it.
+- **Failure**: a project that cannot be read keeps its last document, marked with its age and the reason. A `schema_version` it does not know is stated, never guessed at. A project with no document yet shows that it is being read.
+- **Degraded reads**: a read can succeed and still miss something. With `forge` other than `full`, a merged fix cannot be seen, so statuses may be wrong: the last full document stays on the page, with a notice of what could not be read and how old it is. Where no full document exists, the degraded one is shown with that notice and each `merge_unchecked` mark. With `trunk.state` `fetch_failed`, or `remote_branches_read` false, the new document replaces the old and the page says what it missed.
+- **Requirements**: at start the tool checks for `bash`, `git` and `awk` and refuses to run with a clear message where one is missing. `gh` stays optional, as `--json` allows.
 
 ## Testing Strategy
 
@@ -51,15 +54,15 @@ Vitest, for its TypeScript support with no build step. Unit tests cover settings
 - **Linting**: Biome.
 - **Formatting**: Biome, enforced in the gate.
 - **Type checking**: `tsc --noEmit` with `strict`.
-- **Build tooling**: `tsc` to `dist/`, published as the npm package `dev-task-board` with a `bin`, run by `npx dev-task-board`.
+- **Build tooling**: `tsc` to `dist/`, published as the npm package `dev-task-board` with a `bin`, run by `npx dev-task-board`. `files` lists `dist/` and `vendor/`, and `os` lists `linux` and `darwin`. A GitHub Actions workflow publishes with npm trusted publishing when a merge to `main` raises the version in `package.json`, so nothing ships from a local machine. That publish is this project's deploy; a merge that leaves the version alone deploys nothing. Confirming a release means running `npx dev-task-board@<version>`. The first publish is done once by the operator, since a trusted publisher can only be set on a package that exists.
 - **Local hooks**: `simple-git-hooks`: Biome before a commit, type check and tests before a push, as a fast mirror of the gate and never a gate. No stand-down for any class of change.
 - **Commit messages**: Conventional Commits, unchecked, as `ai-toolkit` writes them.
 - **Pull requests**: the `commits-and-pull-requests` skill's form, with no template and no check.
-- **Secrets**: the project holds none. `gh` keeps its own credentials, and the settings file holds account names, never tokens. The ignore file keeps `.env` files out.
+- **Secrets**: the project holds none: publishing uses trusted publishing, with no stored token. `gh` keeps its own credentials, and the settings file holds account names, never tokens. The ignore file keeps `.env` files out.
 - **Dependency updates and audit**: Dependabot weekly for npm and Actions, and `npm audit --audit-level=high` in the gate.
-- **Continuous integration**: GitHub Actions on every pull request: Biome, type check, tests, build and audit. It is the authority and fails rather than skips: a missing `gh`, `git` or bash fails the run.
+- **Continuous integration**: GitHub Actions on every pull request, on Ubuntu and macOS, so bash 3.2 and BSD awk are exercised: Biome, type check, tests, build, audit and a check that the package holds `dist/` and `vendor/`. It is the authority and fails rather than skips: a missing `git`, `bash` or `awk` fails the run. `gh` is stubbed in tests, so its absence is not a failure.
 - **Toolchain pinning**: `.nvmrc` at Node 24, `engines` in `package.json`, and a committed `package-lock.json` with `npm ci`.
 - **Branch protection**: the gate required, changes reach `main` only through pull requests, administrators bound. Applied by the successor once the checks have reported, on the operator's confirmation.
-- **Provisioning**: `npm ci`. Vitest and Biome exclude `.worktrees/` and `.claude/worktrees/` by configuration, whether or not the ignore file names them.
+- **Provisioning**: `npm ci`, on a machine with `git`, `bash` and `awk`. Vitest and Biome exclude `.worktrees/` and `.claude/worktrees/` by configuration, whether or not the ignore file names them.
 - **Ignore entries**: `node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`, `.npmrc`.
 - **Delivery**: the successor `establish-quality-gate` owns every item above but the ignore entries.
