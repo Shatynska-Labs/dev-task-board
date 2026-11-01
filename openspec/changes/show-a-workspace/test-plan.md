@@ -197,3 +197,12 @@ Dispatched: `tests/support/`, of which `fixture.ts` and `temporary.ts` are reuse
 | Second commit in `Every task appears` and `Starting` | `tests/render.test.ts`, `tests/board.test.ts` | a fixture with several files | `tests/render.test.ts -t "of a document the carried tool printed"`, `tests/board.test.ts -t "shows a project's tasks"` | `buildFixtureRepository`: commits one file only | no | an extra `committedFiles` form of it in `fixture.ts` |
 | `directories`, `workspace`, `refusal` | `tests/settings.test.ts` | an `isDirectory` port; TOML text | `tests/settings.test.ts` | none | no | keep local |
 | `textOf`, `detailsBlocks`, `smallestDetailsHolding`, `expectInOrder`, `escapedLink` | `tests/render.test.ts` | reading a page | `tests/render.test.ts` | none | no | keep local |
+
+## Dispositions at apply
+
+Written at `apply`, against the promotion list above.
+
+- Document fixtures (`task`, `workstream`, `fullDocument`, `sectionsDocument`, `document`, `minimalDocument`): kept local. Each file's documents differ in what they need, and only `tests/render.test.ts` has builders worth sharing.
+- `stubTool`, `printsDocument`, `waitUntil`, `isRunning`: kept local to the files using them until a later change needs them too.
+- How a server closes: `startServer` takes an optional `AbortSignal`, which `src/board.ts` uses, and resolves to the port as tests expect.
+- `tests/cli.test.ts`: the no-arguments refusal is out, and every spawn has a temporary `HOME` and `XDG_CONFIG_HOME` and a timeout.
