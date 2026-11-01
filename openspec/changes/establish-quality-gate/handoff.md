@@ -13,7 +13,8 @@ Every item is recorded in `AGENTS.md`, `## Testing Strategy` and `## Development
 - The `package.json`, `tsconfig.json` and a lock file; the test runner, Vitest, with `npm test`; `.nvmrc`.
 - Biome for linting and formatting; `tsc --noEmit` with `strict`; the build to `dist/`.
 - Local hooks, as a mirror of the gate.
-- The GitHub Actions gate, which fails rather than skips.
+- The release workflow: a merge raising the version publishes through npm trusted publishing, with `files` and `os` set in `package.json`. The first publish is the operator's, once, on their confirmation.
+- The GitHub Actions gate on Ubuntu and macOS, which fails rather than skips.
 - Dependabot and `npm audit` in the gate.
 - `.worktrees/` and `.claude/worktrees/` excluded from Vitest and Biome by configuration.
 - Branch protection: once the gate's checks have reported at least once, and on the operator's confirmation, require them, require pull requests and bind administrators.
