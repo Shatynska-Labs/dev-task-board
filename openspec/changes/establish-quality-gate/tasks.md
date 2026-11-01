@@ -23,10 +23,10 @@
 ## 4. Once the pull request is open
 
 - [x] 4.1 Verify both platforms report on the pull request, and that a commit breaking a check fails the gate, reverting it afterwards
-- [ ] 4.2 On the operator's confirmation, require both checks and pull requests on `main`, with zero required approvals since the operator works alone, and administrators bound, and verify by reading the setting back
+- [x] 4.2 On the operator's confirmation, require both checks and pull requests on `main`, with zero required approvals since the operator works alone, and administrators bound, and verify by reading the setting back
 
 ## 5. After the merge
 
-- [ ] 5.1 The operator settles the licence, then publishes once from a clean, provisioned `main`, on their own confirmation
+- [ ] 5.1 The operator publishes once from a clean, provisioned `main`, on their own confirmation
 - [ ] 5.2 The operator sets the trusted publisher: repository `Shatynska-Labs/dev-task-board`, workflow `release.yml`
 - [ ] 5.3 Verify `npx dev-task-board@0.1.0 --version` prints `0.1.0`, and that the release workflow's run on `main` published nothing, and that GitHub reports no error for the Dependabot configuration
