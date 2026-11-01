@@ -22,7 +22,7 @@
 
 ## 4. Once the pull request is open
 
-- [ ] 4.1 Verify both platforms report on the pull request, and that a commit breaking a check fails the gate, reverting it afterwards
+- [x] 4.1 Verify both platforms report on the pull request, and that a commit breaking a check fails the gate, reverting it afterwards
 - [ ] 4.2 On the operator's confirmation, require both checks and pull requests on `main`, with zero required approvals since the operator works alone, and administrators bound, and verify by reading the setting back
 
 ## 5. After the merge
