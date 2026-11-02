@@ -209,15 +209,4 @@ describe("Bad settings refuse the start", () => {
 			expect(error.message).toContain("not/here");
 		});
 	});
-
-	describe("A github account", () => {
-		it("is refused, saying it is not yet supported", () => {
-			const text = `${workspace("work", [`${root}/a/one`])}github_account = "someone"\n`;
-
-			const error = refusal(text, everyPathADirectory);
-
-			expect(error.message).toContain("github_account");
-			expect(error.message).toMatch(/not yet supported/i);
-		});
-	});
 });

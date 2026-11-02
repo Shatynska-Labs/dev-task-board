@@ -1,0 +1,70 @@
+## MODIFIED Requirements
+
+### Requirement: Bad settings refuse the start
+
+The command SHALL exit non-zero, naming the settings file and the fault on standard error and starting no server, for a missing file, a file that is not valid TOML, no workspace, a `workspaces` that is not a table, a `projects` that is missing, empty or not a list of strings, a relative path, a path that is not a directory, two projects of one base name in a workspace, a `github_account` that is not a non-empty string, or a workspace named `api`, `.`, `..`, empty, or holding `/`. Paths SHALL be normalised before the base name is taken, a path with an empty or dot base name SHALL be refused, and paths SHALL be checked before duplicates are.
+
+#### Scenario: Missing file
+
+- **WHEN** the command starts with no settings file
+- **THEN** it exits non-zero, and standard error names the path, `[workspaces.<name>]` and `projects`
+
+#### Scenario: Two projects of one name
+
+- **GIVEN** directories `<root>/a/one` and `<root>/b/one`, and a workspace listing both
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming `one`
+
+#### Scenario: A reserved name
+
+- **GIVEN** a workspace named `api`
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming `api`
+
+#### Scenario: A name unusable in an address
+
+- **GIVEN** a workspace named `a/b`
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming `a/b`
+
+#### Scenario: Paths are checked before duplicates
+
+- **GIVEN** a workspace listing `<root>/a/one`, which does not exist, and `<root>/b/one`
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming the path and not the duplicate
+
+#### Scenario: A project with no usable name
+
+- **GIVEN** a project path of `/`
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming the path
+
+#### Scenario: A project that does not exist
+
+- **GIVEN** a project path that is not a directory
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming the path
+
+#### Scenario: A github account
+
+- **GIVEN** a workspace whose `github_account` is empty, or a number
+- **WHEN** the settings are read
+- **THEN** the start is refused, naming the workspace and `github_account`
+
+## ADDED Requirements
+
+### Requirement: A workspace may name a GitHub account
+
+A workspace MAY hold `github_account`, a non-empty string, which SHALL be read as given. Whether `gh` holds that account SHALL NOT be checked when the settings are read.
+
+#### Scenario: With an account
+
+- **GIVEN** a workspace with `github_account = "someone"`
+- **WHEN** the settings are read
+- **THEN** the workspace holds that account
+
+#### Scenario: Without an account
+
+- **GIVEN** a workspace with no `github_account`
+- **WHEN** the settings are read
+- **THEN** the workspace holds no account

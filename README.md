@@ -45,7 +45,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Architecture
 
-- **Settings** at `~/.config/dev-task-board/config.toml`: `[workspaces.<name>]` with `projects`, a list of paths, and an optional `github_account`. A project's address is its directory's base name, and two of one name in a workspace are refused at start. `api` is reserved as a workspace name. With no `github_account`, `gh` is used as it is logged in; with one, its token from `gh auth token --user` goes in that read's environment alone, never stored or logged, so the user's active login does not change. Where that token cannot be had, the read runs with no forge access rather than falling through to the active login, and the page names the account.
+- **Settings** at `~/.config/dev-task-board/config.toml`: `[workspaces.<name>]` with `projects`, a list of paths, and an optional `github_account`. A project's address is its directory's base name, and two of one name in a workspace are refused at start. `api` is reserved as a workspace name. With no `github_account`, `gh` is used as it is logged in; with one, its token from `gh auth token --user` goes in that read's environment alone, never stored or logged, so the user's active login does not change. Where that token cannot be had, the read runs with no access through `gh` rather than falling through to the active login, and the page names the account.
 - **Collector**: for each project, runs the carried tool with `--json`, checks `schema_version`, and caches the document in memory, per workspace and project. A project's page reads that project and an overview reads its projects in parallel, each request waiting for its reads, and a project has one read at a time, so a request during one waits for it. Beyond one pass at start, nothing runs between requests, so a tab left open costs nothing. A read has a limit of 60 seconds, and passing it counts as a failure with that reason.
 - **Server**: binds to `127.0.0.1` only. The default port is 8766, so a pinned tab keeps its address, and `--port` changes it. A port in use refuses to start with a clear message. `/<workspace>` is the overview and `/<workspace>/<project>` a project, and `/api/` stays reserved. With one workspace, `/` is that workspace; with several, it lists them. A request with an unexpected `Host` is refused, so a web page cannot reach it by DNS rebinding, and so is one whose `Sec-Fetch-Site` is `cross-site` or `same-site`, so another site cannot start reads. Pages are sent with `Cache-Control: no-store`. All document text is escaped on render, since `--json` gives it as the repository holds it.
 - **Failure**: a project that cannot be read keeps its last document, marked with its age and the reason. A `schema_version` it does not know is stated, never guessed at. One whose reads have only failed shows the reason.
@@ -56,7 +56,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Status
 
-Refreshing a page reads what it shows, so it waits for those reads and then shows each project's tasks as they stand. A read that fails or misses something leaves the last document in place where Architecture says so, and the page says what is kept and what was missed. `github_account` is refused for now, until `switch-between-workspaces`.
+Refreshing a page reads what it shows, so it waits for those reads and then shows each project's tasks as they stand. A read that fails or misses something leaves the last document in place where Architecture says so, and the page says what is kept and what was missed.
 
 ## Running it
 
@@ -65,7 +65,13 @@ Write `~/.config/dev-task-board/config.toml`, or the same under `$XDG_CONFIG_HOM
 ```toml
 [workspaces.work]
 projects = ["~/projects/one", "~/projects/two"]
+
+[workspaces.other]
+projects = ["~/projects/three"]
+github_account = "another-login"
 ```
+
+Workspaces show as tabs. `github_account` is optional, and names a login `gh auth login` already holds: that workspace's reads use it through `gh`, and the active login does not change. `git fetch` is not `gh`, so a remote over SSH still uses your keys.
 
 Then run `npx dev-task-board`, and open the address it prints, `http://127.0.0.1:8766`. `--port` takes another, from 1024.
 

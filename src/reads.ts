@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { type ChildProcessByStdio, spawn } from "node:child_process";
+import type { Readable } from "node:stream";
 import type { Project, Workspace } from "./settings.js";
 
 export type ProjectDocument = {
@@ -37,12 +38,34 @@ export type Reads = {
 	stop(): Promise<void>;
 };
 
+type Run = { limitPassed: boolean } & (
+	| {
+			code: number | null;
+			signal: NodeJS.Signals | null;
+			stdout: string;
+			stderr: string;
+	  }
+	| { spawnError: string }
+);
+
 const KNOWN_SCHEMA = 1;
+// Never a directory, so gh stops before it can read any login.
+const NO_GH_CONFIG = "/dev/null/gh";
 const POLL_MS = 20;
 const DRAIN_MS = 1000;
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function environmentWithNoLogin(): NodeJS.ProcessEnv {
+	const environment: NodeJS.ProcessEnv = {
+		...process.env,
+		GH_CONFIG_DIR: NO_GH_CONFIG,
+	};
+	delete environment.GH_TOKEN;
+	delete environment.GITHUB_TOKEN;
+	return environment;
 }
 
 function signalGroup(pid: number, signal: NodeJS.Signals | 0): boolean {
@@ -109,6 +132,11 @@ export function whatMissed(document: ProjectDocument): string[] {
 	if (document.remote_branches_read === false) {
 		missed.push("Remote branches not read.");
 	}
+	if (typeof document.no_token_for === "string") {
+		missed.push(
+			`No token for GitHub account ${document.no_token_for}: read with no access through gh.`,
+		);
+	}
 	return missed;
 }
 
@@ -169,12 +197,31 @@ export function createReads(
 	const key = (workspace: string, project: string) =>
 		JSON.stringify([workspace, project]);
 
-	function readProject(path: string): Promise<Outcome> {
+	// Runs a command in a process group of its own, which the limit and a stop
+	// can end whole.
+	function runGroup(
+		command: string,
+		args: string[],
+		environment: NodeJS.ProcessEnv | undefined,
+		limitMs: number,
+	): Promise<Run> {
 		return new Promise((resolve) => {
-			const child = spawn("bash", [options.toolPath, "--json", path], {
-				detached: true,
-				stdio: ["ignore", "pipe", "pipe"],
-			});
+			let child: ChildProcessByStdio<null, Readable, Readable>;
+			try {
+				child = spawn(command, args, {
+					detached: true,
+					env: environment,
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+			} catch {
+				// Fixed text: the error quotes the arguments and the environment,
+				// which can hold a token.
+				resolve({
+					limitPassed: false,
+					spawnError: `${command} could not be started`,
+				});
+				return;
+			}
 			let stdout = "";
 			let stderr = "";
 			let limitPassed = false;
@@ -195,20 +242,20 @@ export function createReads(
 			const timer = setTimeout(() => {
 				limitPassed = true;
 				void stop();
-			}, options.limitMs);
+			}, limitMs);
 			if (child.pid !== undefined) {
 				running.set(child.pid, stop);
 			}
 			const closed = new Promise((closes) => child.once("close", closes));
-			const finish = (state: Outcome) => {
+			const finish = (run: Run) => {
 				clearTimeout(timer);
 				if (child.pid !== undefined) {
 					running.delete(child.pid);
 				}
-				resolve(state);
+				resolve(run);
 			};
 			child.on("error", (error) => {
-				finish({ state: "failed", reason: error.message });
+				finish({ limitPassed: false, spawnError: error.message });
 			});
 			// Not "close": a process that left the group can hold the pipes open
 			// for as long as it likes, and neither the limit nor a stop may wait
@@ -220,21 +267,96 @@ export function createReads(
 				await Promise.race([closed, delay(DRAIN_MS)]);
 				child.stdout.destroy();
 				child.stderr.destroy();
-				if (limitPassed) {
-					finish({
-						state: "failed",
-						reason: `the read passed its limit of ${options.limitMs / 1000} seconds`,
-					});
-				} else if (code === 0) {
-					finish(outcomeFromOutput(stdout));
-				} else {
-					finish({
-						state: "failed",
-						reason: reasonFromReport(stderr, code, signal),
-					});
-				}
+				finish({ limitPassed, code, signal, stdout, stderr });
 			});
 		});
+	}
+
+	function limitFailure(): Failed {
+		return {
+			state: "failed",
+			reason: `the read passed its limit of ${options.limitMs / 1000} seconds`,
+		};
+	}
+
+	function outcomeOfTool(run: Run): Outcome {
+		if (run.limitPassed) {
+			return limitFailure();
+		}
+		if ("spawnError" in run) {
+			return { state: "failed", reason: run.spawnError };
+		}
+		return run.code === 0
+			? outcomeFromOutput(run.stdout)
+			: {
+					state: "failed",
+					reason: reasonFromReport(run.stderr, run.code, run.signal),
+				};
+	}
+
+	function runTool(
+		path: string,
+		environment: NodeJS.ProcessEnv | undefined,
+		limitMs: number,
+	): Promise<Run> {
+		return runGroup(
+			"bash",
+			[options.toolPath, "--json", path],
+			environment,
+			limitMs,
+		);
+	}
+
+	async function readAsAccount(
+		path: string,
+		account: string,
+	): Promise<Outcome> {
+		const started = Date.now();
+		const lookup = await runGroup(
+			"gh",
+			["auth", "token", "--user", account],
+			undefined,
+			options.limitMs,
+		);
+		const printed =
+			"code" in lookup && lookup.code === 0 ? lookup.stdout.trim() : "";
+		// A process's environment cannot hold a NUL, so such output is no token.
+		const token = printed.includes("\0") ? "" : printed;
+		const remaining = options.limitMs - (Date.now() - started);
+		const prefix = `no token for GitHub account ${account}: `;
+		if (lookup.limitPassed || remaining <= 0) {
+			const failure = limitFailure();
+			const named =
+				token === ""
+					? prefix
+					: `taking the token for GitHub account ${account}: `;
+			return { ...failure, reason: named + failure.reason };
+		}
+		if (stopped) {
+			return { state: "failed", reason: "the board stopped" };
+		}
+		if (token !== "") {
+			const environment = { ...process.env, GH_TOKEN: token };
+			return outcomeOfTool(await runTool(path, environment, remaining));
+		}
+		const outcome = outcomeOfTool(
+			await runTool(path, environmentWithNoLogin(), remaining),
+		);
+		return outcome.state === "failed"
+			? { ...outcome, reason: prefix + outcome.reason }
+			: {
+					...outcome,
+					document: { ...outcome.document, no_token_for: account },
+				};
+	}
+
+	async function readProject(
+		workspace: Workspace,
+		project: Project,
+	): Promise<Outcome> {
+		return workspace.githubAccount === undefined
+			? outcomeOfTool(await runTool(project.path, undefined, options.limitMs))
+			: readAsAccount(project.path, workspace.githubAccount);
 	}
 
 	// One read per project: whoever asks during a read waits for that read.
@@ -244,7 +366,7 @@ export function createReads(
 		if (current !== undefined) {
 			return current;
 		}
-		const read = readProject(project.path).then((outcome) => {
+		const read = readProject(workspace, project).then((outcome) => {
 			states.set(id, settle(states.get(id), outcome, new Date().toISOString()));
 			inFlight.delete(id);
 		});

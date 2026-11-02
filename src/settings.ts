@@ -2,7 +2,11 @@ import { basename, isAbsolute, join, resolve } from "node:path";
 import { parse, TomlError } from "smol-toml";
 
 export type Project = { name: string; path: string };
-export type Workspace = { name: string; projects: Project[] };
+export type Workspace = {
+	name: string;
+	projects: Project[];
+	githubAccount?: string;
+};
 export type SettingsOptions = {
 	home: string;
 	isDirectory: (path: string) => boolean;
@@ -73,12 +77,15 @@ function parseWorkspace(
 	if (!isTable(table)) {
 		throw new SettingsError(`workspace ${name} is not a table`);
 	}
-	if ("github_account" in table) {
+	const { projects, github_account: githubAccount } = table;
+	if (
+		"github_account" in table &&
+		(typeof githubAccount !== "string" || githubAccount === "")
+	) {
 		throw new SettingsError(
-			`workspace ${name}: github_account is not yet supported`,
+			`workspace ${name}: github_account must be a non-empty string`,
 		);
 	}
-	const { projects } = table;
 	if (
 		!Array.isArray(projects) ||
 		projects.length === 0 ||
@@ -102,6 +109,7 @@ function parseWorkspace(
 	return {
 		name,
 		projects: paths.map((path) => ({ name: basename(path), path })),
+		...(typeof githubAccount === "string" ? { githubAccount } : {}),
 	};
 }
 

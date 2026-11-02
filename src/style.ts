@@ -13,6 +13,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sa
 main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
 header { display: grid; gap: 4px }
 h1 { font-size: 24px; margin: 0 }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px 16px; border-bottom: 1px solid var(--line); margin-bottom: 12px }
+.tabs a { padding: 6px 2px; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; min-width: 0; border-bottom: 2px solid transparent; margin-bottom: -1px }
+.tabs a[aria-current="page"] { color: var(--fg); font-weight: 600; border-bottom-color: var(--work) }
 h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600 }
 .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; margin: 0 }
 .notice { color: var(--warn); background: var(--warn-soft); padding: 8px 12px; border-radius: 6px; font-size: 13px; display: grid; gap: 2px }

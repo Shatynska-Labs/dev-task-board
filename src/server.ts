@@ -48,6 +48,7 @@ async function pageFor(
 ): Promise<string | undefined> {
 	const segments = decodedSegments(url);
 	const { workspaces, reads } = state;
+	const names = workspaces.map(({ name }) => name);
 	if (segments === undefined || segments.length > 2) {
 		return undefined;
 	}
@@ -58,7 +59,7 @@ async function pageFor(
 			return renderIndex(workspaces);
 		}
 		await reads.refresh(only.name);
-		return renderOverview(only, reads);
+		return renderOverview(only, reads, names);
 	}
 	const workspace = workspaces.find(({ name }) => name === first);
 	if (workspace === undefined) {
@@ -66,7 +67,7 @@ async function pageFor(
 	}
 	if (project === undefined) {
 		await reads.refresh(workspace.name);
-		return renderOverview(workspace, reads);
+		return renderOverview(workspace, reads, names);
 	}
 	if (!workspace.projects.some(({ name }) => name === project)) {
 		return undefined;
@@ -76,6 +77,7 @@ async function pageFor(
 		workspace.name,
 		project,
 		reads.get(workspace.name, project),
+		names,
 	);
 }
 
