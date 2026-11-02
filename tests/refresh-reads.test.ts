@@ -291,7 +291,7 @@ describe("Each project is read at start and when requested", () => {
 					root,
 					[
 						`echo "$2" >> '${log}'`,
-						`until [ -e '${root}/release-\${2##*/}' ]; do sleep 0.02; done`,
+						`until [ -e "${root}/release-\${2##*/}" ]; do sleep 0.02; done`,
 						`echo '${printed}'`,
 					].join("\n"),
 				),
