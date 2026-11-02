@@ -231,7 +231,7 @@ describe("Addresses reach workspaces and projects", () => {
 
 describe("The overview shows each project's state", () => {
 	describe("Mixed states", () => {
-		it("shows counts, being read and the reason, each in its project's row", () => {
+		it("shows counts, the reason, and being read where a state still holds it, each in its row", () => {
 			const document = fullDocument({
 				tasks: [
 					task("in-work-1", { status: "in_flight", stage: "plan:drafting" }),
@@ -486,7 +486,7 @@ describe("A project's page shows its document", () => {
 	});
 
 	describe("A page for a project not read", () => {
-		it("says it is being read", () => {
+		it("says it is being read, where a state still holds it", () => {
 			const html = renderProject("work", "alpha", reading);
 
 			expect(textOf(html)).toMatch(/being read/i);

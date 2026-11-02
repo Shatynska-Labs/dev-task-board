@@ -135,7 +135,7 @@ afterEach(() => {
 	removeTemporaryDirectories();
 });
 
-describe("Each project is read once at start", () => {
+describe("Each project is read at start and when requested", () => {
 	describe("A readable project", () => {
 		it("holds the document the carried tool printed, and the time of the read", async () => {
 			const root = temporaryDirectory();

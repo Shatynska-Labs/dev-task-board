@@ -172,3 +172,9 @@ Dispatched: `tests/support/`, of which `fixture.ts` and `temporary.ts` are reuse
 ## Recorded changes to derived assertions
 
 - `tests/refresh-render.test.ts -t "keeps the sections in order, with the written and read times"`, within this pass: `written_at` was first matched to the second, `/2026-11-01.22:17:44/`, which nothing states. It failed on that rather than on the read time, so it is now `/2026-11-01.22:17/`, as the existing test matches it. See question 4.
+- `tests/refresh-reads.test.ts`, `held`, during apply: the release path sat in single quotes, so `${2##*/}` never expanded and the stub never exited. `Two requests during one read` failed, and its two siblings passed only by their reads reaching the limit. The arrangement now double-quotes the path; no assertion changed.
+- `tests/board.test.ts -t "answers, showing the project as being read"`, during apply: removed as obsolete, superseded by `tests/refresh-board.test.ts -t "The server answers during a read"`. `get`'s timeout rose to 15 seconds, since a page now waits on a read.
+
+## Dispositions of local arrangement
+
+Every entry above is kept local for this change. `tests/support/` holds the shared arrangement, but promoting the document builders and process helpers means moving tests in files this change otherwise leaves alone, for no behaviour of its own, and the same duplication was kept by `show-a-workspace`. It is recorded as a backlog entry, `share-the-test-arrangement`.

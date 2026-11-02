@@ -13,11 +13,14 @@ const HOST = "127.0.0.1";
 
 export type BoardState = {
 	workspaces: Workspace[];
-	reads: Pick<Reads, "get">;
+	reads: Pick<Reads, "get" | "refresh">;
 };
 
 function answer(response: ServerResponse, status: number, html: string): void {
-	response.writeHead(status, { "content-type": "text/html; charset=utf-8" });
+	response.writeHead(status, {
+		"content-type": "text/html; charset=utf-8",
+		"cache-control": "no-store",
+	});
 	response.end(html);
 }
 
@@ -33,7 +36,16 @@ function decodedSegments(url: string): string[] | undefined {
 	}
 }
 
-function pageFor(url: string, state: BoardState): string | undefined {
+// A page's request starts reads, so a page on another site must not be able to
+// make one. The Host check stops only DNS rebinding.
+function fromAnotherSite(site: string | string[] | undefined): boolean {
+	return site === "cross-site" || site === "same-site";
+}
+
+async function pageFor(
+	url: string,
+	state: BoardState,
+): Promise<string | undefined> {
 	const segments = decodedSegments(url);
 	const { workspaces, reads } = state;
 	if (segments === undefined || segments.length > 2) {
@@ -42,20 +54,29 @@ function pageFor(url: string, state: BoardState): string | undefined {
 	const [first = "", project] = segments;
 	if (first === "" && project === undefined) {
 		const [only, ...others] = workspaces;
-		return only !== undefined && others.length === 0
-			? renderOverview(only, reads)
-			: renderIndex(workspaces);
+		if (only === undefined || others.length > 0) {
+			return renderIndex(workspaces);
+		}
+		await reads.refresh(only.name);
+		return renderOverview(only, reads);
 	}
 	const workspace = workspaces.find(({ name }) => name === first);
 	if (workspace === undefined) {
 		return undefined;
 	}
 	if (project === undefined) {
+		await reads.refresh(workspace.name);
 		return renderOverview(workspace, reads);
 	}
-	return workspace.projects.some(({ name }) => name === project)
-		? renderProject(workspace.name, project, reads.get(workspace.name, project))
-		: undefined;
+	if (!workspace.projects.some(({ name }) => name === project)) {
+		return undefined;
+	}
+	await reads.refresh(workspace.name, project);
+	return renderProject(
+		workspace.name,
+		project,
+		reads.get(workspace.name, project),
+	);
 }
 
 export function startServer(
@@ -64,14 +85,19 @@ export function startServer(
 	signal?: AbortSignal,
 ): Promise<number> {
 	let bound = port;
-	const server = createServer((request, response) => {
+	const server = createServer(async (request, response) => {
 		const { host } = request.headers;
-		if (host !== `127.0.0.1:${bound}` && host !== `localhost:${bound}`) {
+		if (
+			(host !== `127.0.0.1:${bound}` && host !== `localhost:${bound}`) ||
+			fromAnotherSite(request.headers["sec-fetch-site"])
+		) {
 			answer(response, 403, renderNotFound());
 			return;
 		}
 		const page =
-			request.method === "GET" ? pageFor(request.url ?? "", state) : undefined;
+			request.method === "GET"
+				? await pageFor(request.url ?? "", state)
+				: undefined;
 		if (page === undefined) {
 			answer(response, 404, renderNotFound());
 		} else {

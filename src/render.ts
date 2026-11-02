@@ -329,6 +329,10 @@ function renderDocument(document: BoardDocument): string {
 	return parts.join("\n");
 }
 
+function readTime(readAt: string): string {
+	return `${escapeHtml(readAt.slice(0, 19).replace("T", " "))} UTC`;
+}
+
 function counts(state: ProjectState | undefined): string {
 	if (state === undefined || state.state === "reading") {
 		return '<div class="counts">being read</div>';
@@ -342,7 +346,7 @@ function counts(state: ProjectState | undefined): string {
 	const notice = isPartial(document)
 		? `<div class="warning">${forgeNotice(document)}</div>`
 		: "";
-	return `<div class="counts">${inWork} in flight, ${tasks.length} tasks${notice}</div>`;
+	return `<div class="counts">${inWork} in flight, ${tasks.length} tasks. Read ${readTime(state.readAt)}${notice}</div>`;
 }
 
 function page(title: string, heading: string, body: string): string {
@@ -413,7 +417,7 @@ export function renderProject(
 		: "";
 	return page(
 		projectName,
-		heading + written(document),
+		`${heading}<p class="meta">Read ${readTime(state.readAt)}.</p>${written(document)}`,
 		notice + renderDocument(document),
 	);
 }

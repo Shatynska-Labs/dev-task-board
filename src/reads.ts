@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { Workspace } from "./settings.js";
+import type { Project, Workspace } from "./settings.js";
 
 export type ProjectDocument = {
 	schema_version: number;
@@ -19,6 +19,7 @@ export type ReadOptions = {
 
 export type Reads = {
 	get(workspace: string, project: string): ProjectState | undefined;
+	refresh(workspace: string, project?: string): Promise<void>;
 	start(): Promise<void>;
 	stop(): Promise<void>;
 };
@@ -100,6 +101,7 @@ export function createReads(
 ): Reads {
 	const states = new Map<string, ProjectState>();
 	const running = new Map<number, () => Promise<void>>();
+	const inFlight = new Map<string, Promise<void>>();
 	let stopped = false;
 	let finished: Promise<unknown> = Promise.resolve();
 
@@ -174,15 +176,27 @@ export function createReads(
 		});
 	}
 
+	// One read per project: whoever asks during a read waits for that read.
+	function readOnce(workspace: Workspace, project: Project): Promise<void> {
+		const id = key(workspace.name, project.name);
+		const current = inFlight.get(id);
+		if (current !== undefined) {
+			return current;
+		}
+		const read = readProject(project.path).then((state) => {
+			states.set(id, state);
+			inFlight.delete(id);
+		});
+		inFlight.set(id, read);
+		return read;
+	}
+
 	async function readWorkspace(workspace: Workspace): Promise<void> {
 		for (const project of workspace.projects) {
 			if (stopped) {
 				return;
 			}
-			states.set(
-				key(workspace.name, project.name),
-				await readProject(project.path),
-			);
+			await readOnce(workspace, project);
 		}
 	}
 
@@ -194,6 +208,18 @@ export function createReads(
 
 	return {
 		get: (workspace, project) => states.get(key(workspace, project)),
+		async refresh(workspaceName, projectName) {
+			const workspace = workspaces.find(({ name }) => name === workspaceName);
+			if (stopped || workspace === undefined) {
+				return;
+			}
+			const projects = workspace.projects.filter(
+				({ name }) => projectName === undefined || name === projectName,
+			);
+			await Promise.all(
+				projects.map((project) => readOnce(workspace, project)),
+			);
+		},
 		start() {
 			const reading = Promise.all(workspaces.map(readWorkspace)).then(
 				() => undefined,
@@ -204,7 +230,7 @@ export function createReads(
 		async stop() {
 			stopped = true;
 			await Promise.all([...running.values()].map((stop) => stop()));
-			await finished;
+			await Promise.all([finished, ...inFlight.values()]);
 		},
 	};
 }
