@@ -56,7 +56,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Status
 
-Refreshing a page reads what it shows, so it waits for those reads and then shows each project's tasks as they stand. `github_account` is refused for now, until `switch-between-workspaces`.
+Refreshing a page reads what it shows, so it waits for those reads and then shows each project's tasks as they stand. Until the workstream `see-my-projects-live` delivers more, a failed or partial read replaces the project's document with its reason or notice, rather than keeping the last one as Architecture describes. `github_account` is refused for now, until `switch-between-workspaces`.
 
 ## Running it
 

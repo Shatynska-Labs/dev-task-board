@@ -17,10 +17,10 @@
 - **Open questions**: none
 - **Opened**: 2026-11-01, the operator.
 
-## Decisions
-
-**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script, at the cost of waiting for the read on each request.
-
 ## Context
 
 The board's scope, architecture and failure rules are in `README.md`. Status, stage and placement come from `scripts/task-board --json` in `ai-toolkit`, built by that repository's workstream `see-a-projects-tasks`, whose decision 9 made this a separate application.
+
+## Decisions
+
+**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script, at the cost of waiting for the read on each request.
