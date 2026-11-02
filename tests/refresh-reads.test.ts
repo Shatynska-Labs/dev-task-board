@@ -260,7 +260,7 @@ describe("Each project is read at start and when requested", () => {
 			});
 		});
 
-		it("settles, with the reason in place of the document, when the read fails", async () => {
+		it("settles, keeping the document with the reason, when the read fails", async () => {
 			const root = temporaryDirectory();
 			const failing = join(root, "failing");
 			const reads = board(
@@ -277,8 +277,10 @@ describe("Each project is read at start and when requested", () => {
 			await expect(reads.refresh("work", "one")).resolves.toBeUndefined();
 
 			const state = get(reads);
-			expect(state).toMatchObject({ state: "failed" });
-			expect((state as { reason: string }).reason).toContain("refused");
+			expect(state).toMatchObject({
+				state: "read",
+				latest: { reason: expect.stringContaining("refused") },
+			});
 		});
 	});
 
