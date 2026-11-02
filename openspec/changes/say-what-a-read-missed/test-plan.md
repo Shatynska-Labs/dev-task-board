@@ -160,3 +160,7 @@ Nothing in the change's artifacts addressed this pass with an instruction.
 | `task`, `fullDocument`, `trunk` | `render` | The tool's document and its tasks | whole file | `task`, `fullDocument`, `tests/refresh-render.test.ts` and `tests/render.test.ts`; here `last_commit` is `null` so no task age is mistaken for a document's | `tests/support/documents.ts` |
 | `read`, `keptPast`, `page` | `render` | A `ProjectState` holding a document, with or without `latest` | whole file | `read`, `page`, `tests/refresh-render.test.ts` | Keep local, or with the documents |
 | `overview`, `row`, `textOf`, `count`, `expectNoNotice` | `render` | The overview's store, and reading a rendered page | whole file | `overview`, `textOf`, `tests/refresh-render.test.ts` | `tests/support/pages.ts` for `overview` and `textOf`; keep the rest local |
+
+### Disposition
+
+Every entry above is **kept** local. `share-the-test-arrangement` in `docs/backlog/` already moves these same helpers out of every test file at once, and promoting them here would leave `tests/refresh-*.test.ts` with the copies it found them in, so two versions of each would be live until that entry is done. `Latest` and `State` stay too: they let a test read either shape of `latest` without narrowing, which the exported union does not. The archive step adds this file's entries to that backlog entry.

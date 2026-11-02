@@ -1,4 +1,11 @@
-import type { ProjectState, Reads } from "./reads.js";
+import {
+	isFull,
+	type LatestRead,
+	type ProjectDocument,
+	type ProjectState,
+	type Reads,
+	whatMissed,
+} from "./reads.js";
 import type { Workspace } from "./settings.js";
 import { STYLE } from "./style.js";
 
@@ -75,14 +82,6 @@ function inline(text: unknown): string {
 	return escapeHtml(text)
 		.replace(/`([^`]+)`/g, "<code>$1</code>")
 		.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-}
-
-function forgeNotice(document: BoardDocument): string {
-	return `The forge read was ${escapeHtml(document.forge)}: statuses may be wrong.`;
-}
-
-function isPartial(document: BoardDocument): boolean {
-	return document.forge !== "full";
 }
 
 function timeOf(stamp: string | undefined): number {
@@ -291,7 +290,7 @@ function renderDocument(document: BoardDocument): string {
 	const groups = (list: Stream[]) =>
 		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
 	const parts: string[] = [];
-	const partial = isPartial(document);
+	const partial = !isFull(document as ProjectDocument);
 	parts.push(
 		section(
 			`In work (${inWork.length})`,
@@ -333,6 +332,40 @@ function readTime(readAt: string): string {
 	return `${escapeHtml(readAt.slice(0, 19).replace("T", " "))} UTC`;
 }
 
+function keptFor(readAt: string, at: string): string {
+	const seconds = Math.floor((Date.parse(at) - Date.parse(readAt)) / 1000);
+	if (seconds < 60) {
+		return "under a minute";
+	}
+	if (seconds < 3600) {
+		return `${Math.floor(seconds / 60)} min`;
+	}
+	return seconds < 86400
+		? `${Math.floor(seconds / 3600)} h`
+		: `${Math.floor(seconds / 86400)} d`;
+}
+
+// Each line once, since a kept document and the read past it can miss the same
+// thing.
+function noticeLines(
+	document: ProjectDocument,
+	readAt: string,
+	latest: LatestRead | undefined,
+): string[] {
+	const missed = new Set([
+		...whatMissed(document),
+		...(latest !== undefined && "missed" in latest ? latest.missed : []),
+	]);
+	const lines = [...missed].map(escapeHtml);
+	if (latest === undefined) {
+		return lines;
+	}
+	const kept = `Kept from the read of ${readTime(readAt)}, ${keptFor(readAt, latest.at)} before the latest read, at ${readTime(latest.at)}.`;
+	return "reason" in latest
+		? [kept, `The latest read failed: ${escapeHtml(latest.reason)}`, ...lines]
+		: [kept, ...lines];
+}
+
 function counts(state: ProjectState | undefined): string {
 	if (state === undefined || state.state === "reading") {
 		return '<div class="counts">being read</div>';
@@ -343,9 +376,9 @@ function counts(state: ProjectState | undefined): string {
 	const document = state.document as BoardDocument;
 	const tasks = document.tasks ?? [];
 	const inWork = tasks.filter((task) => task.status === "in_flight").length;
-	const notice = isPartial(document)
-		? `<div class="warning">${forgeNotice(document)}</div>`
-		: "";
+	const notice = noticeLines(state.document, state.readAt, state.latest)
+		.map((line) => `<div class="warning">${line}</div>`)
+		.join("");
 	return `<div class="counts">${inWork} in flight, ${tasks.length} tasks. Read ${readTime(state.readAt)}${notice}</div>`;
 }
 
@@ -412,9 +445,11 @@ export function renderProject(
 		);
 	}
 	const document = state.document as BoardDocument;
-	const notice = isPartial(document)
-		? `<div class="notice">${forgeNotice(document)}</div>\n`
-		: "";
+	const lines = noticeLines(state.document, state.readAt, state.latest);
+	const notice =
+		lines.length > 0
+			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
+			: "";
 	return page(
 		projectName,
 		`${heading}<p class="meta">Read ${readTime(state.readAt)}.</p>${written(document)}`,

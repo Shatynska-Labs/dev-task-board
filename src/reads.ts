@@ -6,10 +6,23 @@ export type ProjectDocument = {
 	[field: string]: unknown;
 };
 
-export type ProjectState =
-	| { state: "reading" }
-	| { state: "read"; document: ProjectDocument; readAt: string }
-	| { state: "failed"; reason: string };
+// A later read that did not replace the document held.
+export type LatestRead =
+	| { at: string; reason: string }
+	| { at: string; missed: string[] };
+
+type Held = {
+	state: "read";
+	document: ProjectDocument;
+	readAt: string;
+	latest?: LatestRead;
+};
+
+type Failed = { state: "failed"; reason: string };
+
+export type ProjectState = { state: "reading" } | Held | Failed;
+
+type Outcome = Held | Failed;
 
 export type ReadOptions = {
 	toolPath: string;
@@ -73,7 +86,55 @@ function reasonFromReport(
 	);
 }
 
-function stateFromOutput(stdout: string): ProjectState {
+export function isFull(document: ProjectDocument): boolean {
+	return document.forge === "full";
+}
+
+export function whatMissed(document: ProjectDocument): string[] {
+	const trunk = document.trunk as
+		| { branch?: string; state?: string }
+		| undefined;
+	const missed: string[] = [];
+	if (!isFull(document)) {
+		missed.push(`The forge read was ${document.forge}: statuses may be wrong.`);
+	}
+	if (trunk?.state === "fetch_failed") {
+		missed.push("The trunk may be stale: the fetch failed.");
+	}
+	if (trunk?.state === "no_origin") {
+		missed.push(
+			`No remote named origin: read the current branch, ${trunk.branch}.`,
+		);
+	}
+	if (document.remote_branches_read === false) {
+		missed.push("Remote branches not read.");
+	}
+	return missed;
+}
+
+// What a read leaves a project holding: only a full read is sure to replace a
+// document, and a degraded one replaces anything but a full one.
+export function settle(
+	previous: ProjectState | undefined,
+	outcome: Outcome,
+	at: string,
+): ProjectState {
+	if (previous?.state !== "read") {
+		return outcome;
+	}
+	if (outcome.state === "failed") {
+		return { ...previous, latest: { at, reason: outcome.reason } };
+	}
+	if (isFull(previous.document) && !isFull(outcome.document)) {
+		return {
+			...previous,
+			latest: { at, missed: whatMissed(outcome.document) },
+		};
+	}
+	return outcome;
+}
+
+function outcomeFromOutput(stdout: string): Outcome {
 	let document: unknown;
 	try {
 		document = JSON.parse(stdout);
@@ -108,7 +169,7 @@ export function createReads(
 	const key = (workspace: string, project: string) =>
 		JSON.stringify([workspace, project]);
 
-	function readProject(path: string): Promise<ProjectState> {
+	function readProject(path: string): Promise<Outcome> {
 		return new Promise((resolve) => {
 			const child = spawn("bash", [options.toolPath, "--json", path], {
 				detached: true,
@@ -139,7 +200,7 @@ export function createReads(
 				running.set(child.pid, stop);
 			}
 			const closed = new Promise((closes) => child.once("close", closes));
-			const finish = (state: ProjectState) => {
+			const finish = (state: Outcome) => {
 				clearTimeout(timer);
 				if (child.pid !== undefined) {
 					running.delete(child.pid);
@@ -165,7 +226,7 @@ export function createReads(
 						reason: `the read passed its limit of ${options.limitMs / 1000} seconds`,
 					});
 				} else if (code === 0) {
-					finish(stateFromOutput(stdout));
+					finish(outcomeFromOutput(stdout));
 				} else {
 					finish({
 						state: "failed",
@@ -183,8 +244,8 @@ export function createReads(
 		if (current !== undefined) {
 			return current;
 		}
-		const read = readProject(project.path).then((state) => {
-			states.set(id, state);
+		const read = readProject(project.path).then((outcome) => {
+			states.set(id, settle(states.get(id), outcome, new Date().toISOString()));
 			inFlight.delete(id);
 		});
 		inFlight.set(id, read);
