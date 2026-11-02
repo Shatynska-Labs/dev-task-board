@@ -1,0 +1,13 @@
+## 1. Reads
+
+- [ ] 1.1 Add `whatMissed`, `settle` and the `latest` field to `src/reads.ts`, and call `settle` from `readOnce`, revise the test in `tests/refresh-reads.test.ts` titled `settles, with the reason in place of the document, when the read fails`, which asserts what this change replaces, to the kept document, and verify the derived tests of `project-reads` pass, including that a project failing with no document is still failed
+
+## 2. Pages
+
+- [ ] 2.1 Draw what a document missed and what a kept document is in `src/render.ts`, on the project page and the overview row, with the age function the design names, and verify the derived tests of `board-pages` pass, with the existing forge notice's tests unchanged
+
+## 3. Finishing
+
+- [ ] 3.1 Raise the version to `0.4.0` in `package.json` and `package-lock.json`, remove the sentence from `README.md`'s Status that says a failed or partial read replaces the document, and verify `npm run check:package`
+- [ ] 3.2 Run `npm test`, `npm run typecheck`, `npx biome ci .`, `npm run build` and `npm audit --audit-level=high`, and verify all pass
+- [ ] 3.3 With `gh` logged in, run the built board against a clone of a real project and open its page, so that its first read is `full`. Point the clone's `origin` at an address that refuses at once, such as `https://127.0.0.1:9/x.git`, since neither git call has a timeout and an address dropping packets would pass the read's limit instead, then refresh, and verify the page keeps the document and names the fetch, the remote branches and the forge. Restore `origin`, refresh, and verify the notice goes. Record what was seen here
