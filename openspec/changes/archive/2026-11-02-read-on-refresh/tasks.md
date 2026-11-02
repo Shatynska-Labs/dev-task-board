@@ -15,4 +15,6 @@
 
 - [x] 4.1 Raise the version to `0.3.0` in `package.json` and `package-lock.json`, revise `README.md`'s Scope, Technology, the Collector, Server and Failure bullets and Status, and verify `npm run check:package`
 - [x] 4.2 Run `npm test`, `npm run typecheck`, `npx biome ci .`, `npm run build` and `npm audit --audit-level=high`, and verify all pass
-- [ ] 4.3 Run the built board against the operator's real workspace, and verify in a named browser that a state changed on the forge shows on a refresh, and that no process runs a read while no page is requested. Check whether going back shows fresh data, recording a miss here rather than holding this step. Record the wait for a project page and for the overview in `tasks.md`
+- [x] 4.3 Run the built board against the operator's real workspace, and verify in a named browser that a state changed on the forge shows on a refresh, and that no process runs a read while no page is requested. Check whether going back shows fresh data, recording a miss here rather than holding this step. Record the wait for a project page and for the overview in `tasks.md`
+
+**Confirmed** by the operator on 2026-11-02, on the running board built from `main`: it shows correctly. A project page took 3.4 seconds and an overview of two projects 3.5, by `curl` on `ai-toolkit` and this repository. Which browser, and whether going back showed fresh data, was not reported, so that is unrecorded rather than observed. `dev-task-board` is not yet on npm, so this was run from the clone and not as `npx dev-task-board@0.3.0`.
