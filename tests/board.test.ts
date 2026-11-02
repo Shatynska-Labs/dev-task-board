@@ -206,7 +206,7 @@ function get(
 				path,
 				headers: { Host: `127.0.0.1:${port}` },
 				agent: false,
-				timeout: 5000,
+				timeout: 15_000,
 			},
 			(response) => {
 				let body = "";
@@ -488,29 +488,6 @@ describe("What the tool needs is checked at start", () => {
 			await listening(board, port);
 
 			expect((await get(port, "/")).status).toBe(200);
-		});
-	});
-});
-
-describe("Each project is read once at start", () => {
-	describe("The server answers during a read", () => {
-		it("answers, showing the project as being read", async () => {
-			const { root, env, project } = validEnvironment();
-			const { log } = slowGh(root);
-			const port = await freePort();
-
-			const board = start(["--port", String(port)], env);
-			await listening(board, port);
-			await waitUntil(() => lines(log).length > 0);
-
-			const projectPage = await get(port, "/work/one");
-			const overview = await get(port, "/work");
-
-			expect(lines(log)).toEqual([project]);
-			expect(projectPage.status).toBe(200);
-			expect(projectPage.body).toMatch(/being read/i);
-			expect(overview.status).toBe(200);
-			expect(overview.body).toMatch(/being read/i);
 		});
 	});
 });

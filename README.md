@@ -19,7 +19,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 - Named workspaces, each one tab, with an explicit list of projects, one workspace by default and any number more. Names and projects live in the user's settings, and nothing about a user is in the code.
 - For each project what `scripts/task-board --json` reports: what is in work and at what stage, workstreams that open to their steps, and tasks no workstream holds.
-- Refreshing in the background, showing when the data was last read, and saying plainly when a read failed.
+- Reading when a page is refreshed, showing when the data was read, and saying plainly when a read failed.
 - An overview of a workspace's projects, opening into each.
 - A setup command writing the settings, and one command to start it.
 
@@ -38,7 +38,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 - **TypeScript on Node**.
 - **Node's own `node:http`, with no web framework.** There are a handful of routes and no state beyond a cache, and a public tool installed by others is better with few dependencies.
-- **Pages rendered on the server as HTML, with a small script** that refreshes the data and keeps opened rows open. No client framework: the accepted layout is plain markup with `<details>`, and the page stays readable with scripting off.
+- **Pages rendered on the server as HTML, with no script.** The accepted layout is plain markup with `<details>`.
 - **`smol-toml`** for the settings file, the one runtime dependency.
 - **`scripts/task-board` carried as a pinned copy** at `vendor/task-board`, with its source commit in `vendor/task-board.source`, so nothing depends on where `ai-toolkit` sits on a disk. It stands alone, sourcing nothing, and runs through `bash`. Bumping it is a normal change, which `schema_version` guards.
 - **Platforms**: Linux, WSL and macOS, where bash, git and awk are ordinary. Windows outside WSL is not supported.
@@ -46,9 +46,9 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 ## Architecture
 
 - **Settings** at `~/.config/dev-task-board/config.toml`: `[workspaces.<name>]` with `projects`, a list of paths, and an optional `github_account`. A project's address is its directory's base name, and two of one name in a workspace are refused at start. `api` is reserved as a workspace name. With no `github_account`, `gh` is used as it is logged in; with one, its token from `gh auth token --user` goes in that read's environment alone, never stored or logged, so the user's active login does not change. Where that token cannot be had, the read runs with no forge access rather than falling through to the active login, and the page names the account.
-- **Collector**: for each project, runs the carried tool with `--json`, checks `schema_version`, and caches the document in memory. Documents are cached per workspace and project. It runs on a timer, one project at a time per workspace, so a refresh never waits on a read. The page's script asks only while the page is visible, and the timer stops five minutes after the last request, so a hidden tab costs nothing. A workspace is read again a minute after its last pass ends, and a request restarts a stopped timer. A read has a limit of 60 seconds, and passing it counts as a failure with that reason.
-- **Server**: binds to `127.0.0.1` only. The default port is 8766, so a pinned tab keeps its address, and `--port` changes it. A port in use refuses to start with a clear message. `/<workspace>` is the overview, `/<workspace>/<project>` a project, and `/api/...` the cached documents with their read time. With one workspace, `/` is that workspace; with several, it lists them. A request with an unexpected `Host` is refused, so a web page cannot reach it by DNS rebinding. All document text is escaped on render, since `--json` gives it as the repository holds it.
-- **Failure**: a project that cannot be read keeps its last document, marked with its age and the reason. A `schema_version` it does not know is stated, never guessed at. A project with no document yet shows that it is being read, and one whose reads have only failed shows the reason.
+- **Collector**: for each project, runs the carried tool with `--json`, checks `schema_version`, and caches the document in memory, per workspace and project. A project's page reads that project and an overview reads its projects in parallel, each request waiting for its reads, and a project has one read at a time, so a request during one waits for it. Beyond one pass at start, nothing runs between requests, so a tab left open costs nothing. A read has a limit of 60 seconds, and passing it counts as a failure with that reason.
+- **Server**: binds to `127.0.0.1` only. The default port is 8766, so a pinned tab keeps its address, and `--port` changes it. A port in use refuses to start with a clear message. `/<workspace>` is the overview and `/<workspace>/<project>` a project, and `/api/` stays reserved. With one workspace, `/` is that workspace; with several, it lists them. A request with an unexpected `Host` is refused, so a web page cannot reach it by DNS rebinding, and so is one whose `Sec-Fetch-Site` is `cross-site` or `same-site`, so another site cannot start reads. Pages are sent with `Cache-Control: no-store`. All document text is escaped on render, since `--json` gives it as the repository holds it.
+- **Failure**: a project that cannot be read keeps its last document, marked with its age and the reason. A `schema_version` it does not know is stated, never guessed at. One whose reads have only failed shows the reason.
 - **Degraded reads**: a read can succeed and still miss something. With `forge` other than `full`, a merged fix cannot be seen, so statuses may be wrong: the last full document stays on the page, with a notice of what could not be read and how old it is. Where no full document exists, the degraded one is shown with that notice and each `merge_unchecked` mark. Only with `forge` `full` does a read with `trunk.state` `fetch_failed`, or `remote_branches_read` false, replace the old document, with the page saying what it missed. A network outage gives all three at once, and the forge rule decides it: the last full document stays, and the notice lists everything missed.
 - **Requirements**: at start the tool checks for `bash`, `git` and `awk` and refuses to run with a clear message where one is missing. `gh` stays optional, as `--json` allows.
 
@@ -56,7 +56,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Status
 
-It shows each project's tasks as they stood at start, and restarting is the only refresh until the workstream `see-my-projects-live` delivers more. `github_account` is refused for now, until `switch-between-workspaces`.
+Refreshing a page reads what it shows, so it waits for those reads and then shows each project's tasks as they stand. Until the workstream `see-my-projects-live` delivers more, a failed or partial read replaces the project's document with its reason or notice, rather than keeping the last one as Architecture describes. `github_account` is refused for now, until `switch-between-workspaces`.
 
 ## Running it
 

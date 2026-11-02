@@ -46,9 +46,10 @@ const oneWorkspace = [
 
 const readEverything = {
 	get: (_workspace: string, project: string) =>
-		project === "one"
+		project === "one" || project === "two words"
 			? { state: "read", document, readAt: "2026-11-01T22:18:00Z" }
 			: { state: "reading" },
+	refresh: async () => {},
 };
 
 function serve(workspaces: unknown = oneWorkspace) {
@@ -218,7 +219,7 @@ describe("Addresses reach workspaces and projects", () => {
 			const response = await request(port, "/work/two%20words");
 
 			expect(response.status).toBe(200);
-			expect(response.body).toMatch(/being read/i);
+			expect(response.body).toContain("only-task");
 		});
 	});
 
