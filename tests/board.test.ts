@@ -429,7 +429,7 @@ describe("Bad settings refuse the start", () => {
 			],
 			[
 				"a github account",
-				'[workspaces.work]\nprojects = ["/"]\ngithub_account = "x"\n',
+				'[workspaces.work]\nprojects = ["/"]\ngithub_account = ""\n',
 				"github_account",
 			],
 		])(

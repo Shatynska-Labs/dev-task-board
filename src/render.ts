@@ -382,6 +382,18 @@ function counts(state: ProjectState | undefined): string {
 	return `<div class="counts">${inWork} in flight, ${tasks.length} tasks. Read ${readTime(state.readAt)}${notice}</div>`;
 }
 
+// Plain links, since each workspace has an address and pages carry no script.
+function tabs(names: string[], current: string): string {
+	if (names.length < 2) {
+		return "";
+	}
+	const links = names.map(
+		(name) =>
+			`<a href="${href(name)}"${name === current ? ' aria-current="page"' : ""}>${escapeHtml(name)}</a>`,
+	);
+	return `<nav class="tabs" aria-label="Workspaces">${links.join("")}</nav>`;
+}
+
 function page(title: string, heading: string, body: string): string {
 	return layout(title, `<header>${heading}</header>\n${body}`);
 }
@@ -401,6 +413,7 @@ export function renderIndex(workspaces: Workspace[]): string {
 export function renderOverview(
 	workspace: Workspace,
 	reads: Pick<Reads, "get">,
+	workspaceNames: string[] = [],
 ): string {
 	const rows = workspace.projects.map(
 		({ name }) =>
@@ -408,7 +421,7 @@ export function renderOverview(
 	);
 	return page(
 		workspace.name,
-		`<h1>${escapeHtml(workspace.name)}</h1>`,
+		`${tabs(workspaceNames, workspace.name)}<h1>${escapeHtml(workspace.name)}</h1>`,
 		`<div class="list">${rows.join("\n")}</div>`,
 	);
 }
@@ -427,9 +440,10 @@ export function renderProject(
 	workspaceName: string,
 	projectName: string,
 	state: ProjectState | undefined,
+	workspaceNames: string[] = [],
 ): string {
 	const back = `<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
-	const heading = `${back}<h1>${escapeHtml(projectName)}</h1>`;
+	const heading = `${tabs(workspaceNames, workspaceName)}${back}<h1>${escapeHtml(projectName)}</h1>`;
 	if (state === undefined || state.state === "reading") {
 		return page(
 			projectName,

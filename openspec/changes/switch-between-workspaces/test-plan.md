@@ -186,6 +186,8 @@ No other bearing test was found by this search. That means none was found, not t
 | `T` | `document`, `read`, `workspaces`, `recordingReads`, `anyReads`, `serve`, `body`, `links`, `address`, `addresses`, `marked` | the `reads` port and an HTTP client | all of `T` | none | `readEverything`, `serve`, `request` in `tests/server.test.ts`; `stubReads` in `tests/keep-reads.test.ts`, which does not record `get` | `tests/support/server.ts` |
 | `B` | `settingsFile`, `writeSettings`, `ghHolding`, `start`, `freePort`, `listening`, `body`, `project` | a running board and its settings | all of `B` | `isolatedEnvironment`'s `gh`, as above | all but `ghHolding` in `tests/board.test.ts` | `tests/support/board.ts` |
 
+**Disposition**: every entry above is kept local. The backlog entry `share-the-test-arrangement` moves what several test files declare into `tests/support/` as one change, and promoting these alone would do part of it twice, once for this change's names and again for the older files that are their near-misses. That entry is to name these files when this change archives.
+
 ## What the implementation must make pass
 
 Everything in `R`, `P`, `S`, `B` and `T`, plus the two obsolete candidates resolved, as task 1.1 says. Task map:
