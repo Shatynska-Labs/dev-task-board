@@ -2,7 +2,7 @@
 
 ### Requirement: Several workspaces show as tabs
 
-With more than one workspace, an overview and a project's page SHALL show a tab for each workspace in the order of the settings, each a link to its overview with its name percent-encoded in the address and escaped in the text, the one being shown marked with `aria-current="page"`. With one workspace no tabs SHALL appear. The tabs SHALL need no script. Following a tab SHALL read only the projects of the workspace it opens. The list of workspaces at `/` SHALL stay as it is.
+With more than one workspace, an overview and a project's page SHALL show a tab for each workspace in the order of the settings, each a link to its overview with its name percent-encoded in the address and escaped in the text, the one being shown marked with `aria-current="page"`. With one workspace no tabs SHALL appear, and a project's page SHALL link to its workspace above its heading; with tabs its tab SHALL be that link, and no other SHALL be drawn. The tabs SHALL need no script. Following a tab SHALL read only the projects of the workspace it opens. The list of workspaces at `/` SHALL stay as it is.
 
 #### Scenario: Several workspaces
 
@@ -14,13 +14,13 @@ With more than one workspace, an overview and a project's page SHALL show a tab 
 
 - **GIVEN** workspaces `a` and `b`, and a project `one` in `b`
 - **WHEN** `/b/one` is requested
-- **THEN** it links to `/a` and `/b`, and only `b` is marked current
+- **THEN** it links to `/a` and `/b`, once each, and only `b` is marked current
 
 #### Scenario: One workspace
 
 - **GIVEN** one workspace `work`
 - **WHEN** its overview and a project's page are requested
-- **THEN** neither shows tabs
+- **THEN** neither shows tabs, and the project's page links to `/work`
 
 #### Scenario: A name needing care
 

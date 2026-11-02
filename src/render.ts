@@ -442,8 +442,11 @@ export function renderProject(
 	state: ProjectState | undefined,
 	workspaceNames: string[] = [],
 ): string {
-	const back = `<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
-	const heading = `${tabs(workspaceNames, workspaceName)}${back}<h1>${escapeHtml(projectName)}</h1>`;
+	const nav = tabs(workspaceNames, workspaceName);
+	const way =
+		nav ||
+		`<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
+	const heading = `${way}<h1>${escapeHtml(projectName)}</h1>`;
 	if (state === undefined || state.state === "reading") {
 		return page(
 			projectName,
