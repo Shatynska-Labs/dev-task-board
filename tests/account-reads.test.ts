@@ -287,6 +287,14 @@ function isRunning(pid: number): boolean {
 }
 
 // A gh that does not answer, keeping its pid when `exec` replaces it.
+// Answers only when stopped, as a read's lookup that ends in the same instant.
+function tokenOnStop(pid: string): string {
+	return `trap 'echo token-of-someone; exit 0' TERM
+echo $$ > '${pid}'
+sleep 60 &
+wait`;
+}
+
 function ghThatDoesNotAnswer(root: string, before = ""): string {
 	const pid = join(root, "gh.pid");
 	writeGh(root, `${before}\necho $$ > '${pid}'\nexec sleep 60`);
@@ -585,8 +593,56 @@ describe("A read uses its workspace's GitHub account", () => {
 			await reads.refresh("work", "one");
 			const elapsed = Date.now() - started;
 
-			expect(failedReason(reads)).toMatch(/limit|timed? ?out/i);
+			expect(failedReason(reads)).toContain("1.5 seconds");
 			expect(elapsed).toBeLessThan(limitMs + graceMs + 600);
+		});
+
+		it("names the account where the token arrives as the limit passes", async () => {
+			const { root } = machine();
+			writeGh(root, tokenOnStop(join(root, "gh.pid")));
+			const tool = scriptedTool(root);
+			const reads = board(root, tool.path, { limitMs: 300, graceMs: 200 });
+
+			await reads.refresh("work", "one");
+
+			expect(failedReason(reads)).toContain("someone");
+			expect(failedReason(reads)).toContain("0.3 seconds");
+			expect(tool.reads()).toEqual([]);
+		});
+	});
+
+	describe("A value a process cannot be given", () => {
+		it("takes a token holding a NUL as no token, and never shows it", async () => {
+			const { root } = machine();
+			writeGh(root, "printf 'sec\\000ret\\n'");
+			const tool = scriptedTool(root);
+			const reads = board(root, tool.path);
+
+			await reads.refresh("work", "one");
+
+			expect(held(reads).document).toMatchObject({ no_token_for: "someone" });
+			expect(JSON.stringify(get(reads))).not.toContain("sec");
+		});
+
+		it("reads as having no token for an account holding a NUL", async () => {
+			const { root } = machine();
+			const tool = scriptedTool(root);
+			const path = join(root, "one");
+			mkdirSync(path, { recursive: true });
+			const reads = createReads(
+				[
+					{
+						name: "work",
+						projects: [{ name: "one", path }],
+						githubAccount: "a\0b",
+					},
+				],
+				{ toolPath: tool.path, limitMs: 10_000, graceMs: 200 },
+			);
+
+			await reads.refresh("work", "one");
+
+			expect(held(reads).document).toMatchObject({ no_token_for: "a\0b" });
 		});
 	});
 
@@ -653,6 +709,24 @@ describe("A read uses its workspace's GitHub account", () => {
 			await finished;
 
 			await waitUntil(() => !isRunning(gh));
+			expect(tool.reads()).toEqual([]);
+		});
+
+		it("starts no tool where gh prints a token as it stops", async () => {
+			const { root } = machine();
+			const pid = join(root, "gh.pid");
+			writeGh(root, tokenOnStop(pid));
+			const tool = scriptedTool(root);
+			const reads = board(root, tool.path, {
+				limitMs: 20_000,
+				graceMs: 200,
+			});
+
+			const finished = reads.start();
+			await waitUntil(() => existsSync(pid));
+			await reads.stop();
+			await finished;
+
 			expect(tool.reads()).toEqual([]);
 		});
 	});

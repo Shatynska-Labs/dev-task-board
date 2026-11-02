@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { type ChildProcessByStdio, spawn } from "node:child_process";
+import type { Readable } from "node:stream";
 import type { Project, Workspace } from "./settings.js";
 
 export type ProjectDocument = {
@@ -205,11 +206,22 @@ export function createReads(
 		limitMs: number,
 	): Promise<Run> {
 		return new Promise((resolve) => {
-			const child = spawn(command, args, {
-				detached: true,
-				env: environment,
-				stdio: ["ignore", "pipe", "pipe"],
-			});
+			let child: ChildProcessByStdio<null, Readable, Readable>;
+			try {
+				child = spawn(command, args, {
+					detached: true,
+					env: environment,
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+			} catch {
+				// Fixed text: the error quotes the arguments and the environment,
+				// which can hold a token.
+				resolve({
+					limitPassed: false,
+					spawnError: `${command} could not be started`,
+				});
+				return;
+			}
 			let stdout = "";
 			let stderr = "";
 			let limitPassed = false;
@@ -306,15 +318,19 @@ export function createReads(
 			undefined,
 			options.limitMs,
 		);
-		const token =
+		const printed =
 			"code" in lookup && lookup.code === 0 ? lookup.stdout.trim() : "";
+		// A process's environment cannot hold a NUL, so such output is no token.
+		const token = printed.includes("\0") ? "" : printed;
 		const remaining = options.limitMs - (Date.now() - started);
 		const prefix = `no token for GitHub account ${account}: `;
 		if (lookup.limitPassed || remaining <= 0) {
 			const failure = limitFailure();
-			return token === ""
-				? { ...failure, reason: prefix + failure.reason }
-				: failure;
+			const named =
+				token === ""
+					? prefix
+					: `taking the token for GitHub account ${account}: `;
+			return { ...failure, reason: named + failure.reason };
 		}
 		if (stopped) {
 			return { state: "failed", reason: "the board stopped" };
