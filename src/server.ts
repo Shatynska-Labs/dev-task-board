@@ -15,7 +15,7 @@ const HOST = "127.0.0.1";
 
 export type BoardState = {
 	workspaces: Workspace[];
-	reads: Pick<Reads, "get" | "refresh"> & Partial<Pick<Reads, "quick">>;
+	reads: Pick<Reads, "get" | "refresh" | "quick">;
 };
 
 const HEADERS = {
@@ -44,12 +44,10 @@ function projectPage(
 		const full = reads.refresh(workspace, project).then(() => {
 			fullEnded = true;
 		});
-		const quick = reads.quick?.(workspace, project);
-		if (quick !== undefined) {
-			const document = await Promise.race([quick, full.then(() => undefined)]);
-			if (document !== undefined && !fullEnded) {
-				response.write(quickPart(document));
-			}
+		const quick = reads.quick(workspace, project);
+		const document = await Promise.race([quick, full.then(() => undefined)]);
+		if (document !== undefined && !fullEnded) {
+			response.write(quickPart(document));
 		}
 		await full;
 		response.end(projectPageEnd(reads.get(workspace, project)));

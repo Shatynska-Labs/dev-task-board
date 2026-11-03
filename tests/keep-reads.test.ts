@@ -201,6 +201,7 @@ function stubReads(heldProject?: string) {
 			document: fullDocument,
 			readAt: "2026-11-01T22:18:00Z",
 		}),
+		quick: async () => undefined,
 		refresh: (workspace: string, project?: string) => {
 			stub.calls.push([workspace, project]);
 			if (project !== undefined && project === heldProject) {
@@ -393,7 +394,7 @@ describe("Each project is read at start and when requested", () => {
 		});
 	});
 
-	describe("An overview reads every project", () => {
+	describe("A refresh of a whole workspace reads every project", () => {
 		it("overlaps their reads, the first failing, and settles when both have finished", async () => {
 			const root = temporaryDirectory();
 			const log = join(root, "read.log");

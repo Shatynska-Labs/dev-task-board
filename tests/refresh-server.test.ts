@@ -67,6 +67,7 @@ function stubReads(whenRefreshed: () => Promise<void> = async () => {}) {
 			document: documentWith(stub.taskName),
 			readAt: "2026-11-01T22:18:00Z",
 		}),
+		quick: async () => undefined,
 		refresh: (workspace: string, project?: string) => {
 			stub.calls.push([workspace, project]);
 			return whenRefreshed();

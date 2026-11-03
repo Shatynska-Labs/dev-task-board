@@ -413,7 +413,7 @@ describe("Each project is read at start and when requested", () => {
 		});
 	});
 
-	describe("An overview reads every project", () => {
+	describe("A refresh of a whole workspace reads every project", () => {
 		it("overlaps their reads, and settles when both have finished", async () => {
 			const root = temporaryDirectory();
 			const log = join(root, "read.log");

@@ -124,12 +124,15 @@ export function isFull(document: ProjectDocument): boolean {
 	return document.forge === "full";
 }
 
-export function whatMissed(document: ProjectDocument): string[] {
+export function whatMissed(
+	document: ProjectDocument,
+	{ forge = true }: { forge?: boolean } = {},
+): string[] {
 	const trunk = document.trunk as
 		| { branch?: string; state?: string }
 		| undefined;
 	const missed: string[] = [];
-	if (!isFull(document)) {
+	if (forge && !isFull(document)) {
 		missed.push(`The forge read was ${document.forge}: statuses may be wrong.`);
 	}
 	if (trunk?.state === "fetch_failed") {

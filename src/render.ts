@@ -484,8 +484,7 @@ export function projectPageStart(
 }
 
 export function quickPart(document: ProjectDocument): string {
-	const others = whatMissed(document)
-		.filter((line) => !line.startsWith("The forge read was"))
+	const others = whatMissed(document, { forge: false })
 		.map((line) => `<span>${escapeHtml(line)}</span>`)
 		.join("");
 	return phase(

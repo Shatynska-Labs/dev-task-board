@@ -497,6 +497,19 @@ describe("Each project is read at start and when requested", () => {
 			expect(started(m)).toEqual([]);
 		});
 
+		it("starts no read for / with one workspace", async () => {
+			const m = machine();
+			const { port } = await board(m, [
+				{ name: "work", projects: ["one", "two"] },
+			]);
+
+			const { status } = await page(port, "/");
+			await delay(300);
+
+			expect(status).toBe(200);
+			expect(started(m)).toEqual([]);
+		});
+
 		it("ends without waiting for a read in progress", async () => {
 			const m = machine();
 			m.hold("full", "one");
