@@ -187,7 +187,7 @@ function progress(steps: Task[], unplaced: Task[]): string {
 		.map((task) => `<u class="${statusClass(task.status)}"></u>`)
 		.join("");
 	const words = `${done} of ${steps.length} done${flying > 0 ? `, ${flying} in work` : ""}`;
-	return `<div class="progress"><div class="bar">${bar}</div><span>${words}</span></div>`;
+	return `<div class="progress" style="--steps: ${steps.length}"><div class="bar">${bar}</div><span>${words}</span></div>`;
 }
 
 function renderStream(stream: Stream, tasks: Task[], now: number): string {
