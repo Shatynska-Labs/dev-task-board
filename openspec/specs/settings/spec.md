@@ -23,7 +23,7 @@ The command SHALL read `config.toml` under `$XDG_CONFIG_HOME/dev-task-board`, or
 
 ### Requirement: Bad settings refuse the start
 
-The command SHALL exit non-zero, naming the settings file and the fault on standard error and starting no server, for a missing file, a file that is not valid TOML, no workspace, a `workspaces` that is not a table, a `projects` that is missing, empty or not a list of strings, a relative path, a path that is not a directory, two projects of one base name in a workspace, or a workspace named `api`, `.`, `..`, empty, or holding `/`. Paths SHALL be normalised before the base name is taken, a path with an empty or dot base name SHALL be refused, and paths SHALL be checked before duplicates are. It SHALL refuse `github_account`, saying it is not yet supported, rather than read with the wrong account.
+The command SHALL exit non-zero, naming the settings file and the fault on standard error and starting no server, for a missing file, a file that is not valid TOML, no workspace, a `workspaces` that is not a table, a `projects` that is missing, empty or not a list of strings, a relative path, a path that is not a directory, two projects of one base name in a workspace, a `github_account` that is not a non-empty string, or a workspace named `api`, `.`, `..`, empty, or holding `/`. Paths SHALL be normalised before the base name is taken, a path with an empty or dot base name SHALL be refused, and paths SHALL be checked before duplicates are.
 
 #### Scenario: Missing file
 
@@ -68,6 +68,22 @@ The command SHALL exit non-zero, naming the settings file and the fault on stand
 
 #### Scenario: A github account
 
-- **GIVEN** a workspace with `github_account`
+- **GIVEN** a workspace whose `github_account` is empty, or a number
 - **WHEN** the settings are read
-- **THEN** the start is refused, saying it is not yet supported
+- **THEN** the start is refused, naming the workspace and `github_account`
+
+### Requirement: A workspace may name a GitHub account
+
+A workspace MAY hold `github_account`, a non-empty string, which SHALL be read as given. Whether `gh` holds that account SHALL NOT be checked when the settings are read.
+
+#### Scenario: With an account
+
+- **GIVEN** a workspace with `github_account = "someone"`
+- **WHEN** the settings are read
+- **THEN** the workspace holds that account
+
+#### Scenario: Without an account
+
+- **GIVEN** a workspace with no `github_account`
+- **WHEN** the settings are read
+- **THEN** the workspace holds no account
