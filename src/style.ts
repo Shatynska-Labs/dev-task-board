@@ -10,7 +10,12 @@ export const STYLE = `
   --bg: #12191e; --panel: #1a242a; --fg: #e4ebee; --muted: #93a3ac; --line: #2e3c44;
   --done: #5bb78f; --work: #7fb0f5; --work-soft: #1f3250; --warn: #e3a955; --warn-soft: #3c2e17; color-scheme: dark } }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5 }
-main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
+main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px; position: relative }
+.stamp { display: grid; justify-items: end; color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere }
+@media (min-width: 640px) {
+  header.project { padding-right: 260px }
+  .stamp { position: absolute; top: 28px; right: 16px; max-width: 250px }
+}
 header { display: grid; gap: 4px }
 h1 { font-size: 24px; margin: 0 }
 .phase { display: grid; gap: 32px }
