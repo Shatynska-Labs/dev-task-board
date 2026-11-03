@@ -272,7 +272,11 @@ function open(
 				timeout: 25_000,
 			},
 			(response) => {
-				answer({ ...response.headers, status: response.statusCode ?? 0 });
+				answer(
+					Object.assign({}, response.headers, {
+						status: response.statusCode ?? 0,
+					}),
+				);
 				response.setEncoding("utf8");
 				response.on("data", (chunk: string) => {
 					text += chunk;

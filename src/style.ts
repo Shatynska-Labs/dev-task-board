@@ -13,6 +13,8 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sa
 main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
 header { display: grid; gap: 4px }
 h1 { font-size: 24px; margin: 0 }
+.phase { display: grid; gap: 32px }
+.phase:has(~ .phase) { display: none }
 .tabs { display: flex; flex-wrap: wrap; gap: 4px 16px; border-bottom: 1px solid var(--line); margin-bottom: 12px }
 .tabs a { padding: 6px 2px; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; min-width: 0; border-bottom: 2px solid transparent; margin-bottom: -1px }
 .tabs a[aria-current="page"] { color: var(--fg); font-weight: 600; border-bottom-color: var(--work) }
