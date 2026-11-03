@@ -432,14 +432,16 @@ export function renderOverview(
 	);
 }
 
+// When and from what a document was written, in one short line.
 function written(document: BoardDocument): string {
-	const when = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(document.written_at ?? "")
-		? `${document.written_at?.slice(0, 16).replace("T", " ")} UTC`
-		: document.written_at;
+	const stamp = document.written_at ?? "";
+	const when = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(stamp)
+		? `${stamp.slice(0, 16).replace("T", " ")} UTC`
+		: stamp;
 	const trunk = document.trunk
-		? `, from ${escapeHtml(document.trunk.ref)} ${escapeHtml(document.trunk.commit)}`
+		? `${escapeHtml(document.trunk.ref)} ${escapeHtml(document.trunk.commit)} · `
 		: "";
-	return `<p class="meta">Written ${escapeHtml(when)}${trunk}.</p>`;
+	return `<span>${trunk}written ${escapeHtml(when)}</span>`;
 }
 
 function projectHeading(
@@ -450,7 +452,7 @@ function projectHeading(
 	const way =
 		tabs(workspaceNames, workspaceName) ||
 		`<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
-	return `<header>${way}<h1>${escapeHtml(projectName)}</h1></header>\n`;
+	return `<header class="project">${way}<h1>${escapeHtml(projectName)}</h1></header>\n`;
 }
 
 // One part of a project's page; the style shows only the last one sent.
@@ -471,7 +473,7 @@ function projectState(state: ProjectState | undefined): string {
 		lines.length > 0
 			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
 			: "";
-	return `<p class="meta">Read ${readTime(state.readAt)}.</p>${written(document)}\n${notice}${renderDocument(document)}`;
+	return `<div class="stamp"><span>Read ${readTime(state.readAt)}</span>${written(document)}</div>\n${notice}${renderDocument(document)}`;
 }
 
 // The parts of a project's page, for a server that sends them as reads end.
