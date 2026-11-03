@@ -327,10 +327,6 @@ describe("A project's page shows its document", () => {
 
 			expect(textOf(page(document))).not.toMatch(/unplaced/i);
 		});
-
-		it("shows the document's written_at", () => {
-			expect(textOf(page(sectionsDocument()))).toMatch(/2026-11-01.22:17/);
-		});
 	});
 
 	describe("Every task appears", () => {

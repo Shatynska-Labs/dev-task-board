@@ -191,7 +191,7 @@ describe("The overview shows each project's state", () => {
 
 describe("A project's page shows its document", () => {
 	describe("The sections", () => {
-		it("keeps the sections in order, with the written and read times", () => {
+		it("keeps the sections in order, with the read time", () => {
 			const text = textOf(page(sectionsDocument()));
 
 			expectInOrder(text, [
@@ -200,7 +200,6 @@ describe("A project's page shows its document", () => {
 				"later-goal",
 				"loose-task",
 			]);
-			expect(text).toMatch(/2026-11-01.22:17/);
 			expect(text).toContain(`Read ${shownTime}`);
 		});
 

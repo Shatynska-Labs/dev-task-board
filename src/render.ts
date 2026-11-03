@@ -432,18 +432,6 @@ export function renderOverview(
 	);
 }
 
-// When and from what a document was written, in one short line.
-function written(document: BoardDocument): string {
-	const stamp = document.written_at ?? "";
-	const when = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(stamp)
-		? `${stamp.slice(0, 16).replace("T", " ")} UTC`
-		: stamp;
-	const trunk = document.trunk
-		? `${escapeHtml(document.trunk.ref)} ${escapeHtml(document.trunk.commit)} · `
-		: "";
-	return `<span>${trunk}written ${escapeHtml(when)}</span>`;
-}
-
 function projectHeading(
 	workspaceName: string,
 	projectName: string,
@@ -473,7 +461,7 @@ function projectState(state: ProjectState | undefined): string {
 		lines.length > 0
 			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
 			: "";
-	return `<div class="stamp"><span>Read ${readTime(state.readAt)}</span>${written(document)}</div>\n${notice}${renderDocument(document)}`;
+	return `<p class="stamp">Read ${readTime(state.readAt)}</p>\n${notice}${renderDocument(document)}`;
 }
 
 // The parts of a project's page, for a server that sends them as reads end.
