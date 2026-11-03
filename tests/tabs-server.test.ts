@@ -162,6 +162,22 @@ describe("Several workspaces show as tabs", () => {
 			expect(addresses(html)).toEqual(expect.arrayContaining(["/a", "/b"]));
 			expect(marked(html)).toEqual(["/b"]);
 		});
+
+		it("has its tab as the one link to its workspace", async () => {
+			const port = await serve(workspaces("a", "b"));
+
+			const html = await body(port, "/b/one");
+
+			expect(addresses(html).filter((link) => link === "/b")).toEqual(["/b"]);
+		});
+
+		it("keeps a link to its workspace where there are no tabs", async () => {
+			const port = await serve(workspaces("work"));
+
+			const html = await body(port, "/work/one");
+
+			expect(addresses(html)).toContain("/work");
+		});
 	});
 
 	describe("One workspace", () => {
