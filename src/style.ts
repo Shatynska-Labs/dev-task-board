@@ -49,15 +49,17 @@ h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: v
 .mark { color: var(--warn); font-size: 12px; margin-left: 6px }
 .groups { display: grid; gap: 8px }
 details.group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
-details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: 14px minmax(0, 1fr) 150px; gap: 10px; align-items: center }
+details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: 14px minmax(0, 1fr) 240px; gap: 10px; align-items: center }
 summary::-webkit-details-marker { display: none }
 summary:focus-visible, a:focus-visible { outline: 2px solid var(--work); outline-offset: 2px }
 .chev { color: var(--muted); font-size: 11px }
 details[open] > summary .chev { transform: rotate(90deg) }
 .sub { color: var(--muted); font-size: 13px; margin-top: 2px }
 .progress { display: grid; gap: 3px; font-size: 12px; color: var(--muted); text-align: right }
-.bar { display: flex; gap: 3px }
-.bar u { flex: 1; height: 8px; border-radius: 2px; border: 1px solid var(--line) }
+.bar { display: flex; gap: 2px }
+/* Room for 50 steps in 240px: a recorded step is solid and a planned one dashed,
+   in one colour, so the less certain one reads lighter. */
+.bar u { flex: 1; min-width: 0; height: 8px; border-radius: 2px; border: 1px solid var(--muted) }
 .bar u.done { background: var(--done); border-color: var(--done) }
 .bar u.flight { background: var(--work); border-color: var(--work) }
 .bar u.planned { border-style: dashed; border-color: var(--muted) }
