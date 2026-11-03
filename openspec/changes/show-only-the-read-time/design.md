@@ -11,4 +11,4 @@
 ## Risks / Trade-offs
 
 - [A name long enough to wrap puts the time level with its last line] → The heading's right padding keeps them apart.
-- [The margins depend on `main`'s gap, the part's gap and the heading's line height] → All are set in `src/style.ts`, the line height through `body`.
+- [The offset `top: -68px` depends on `main`'s gap (32px) and the heading's line (24px at `body`'s 1.5), and on the `h1` closing `header.project`] → All are set in `src/style.ts`, the line height through `body`.
