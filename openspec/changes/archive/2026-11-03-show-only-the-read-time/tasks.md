@@ -9,3 +9,5 @@
 **Obsolete tests**: `shows the document's written_at` in `tests/render.test.ts` is removed, and the `written_at` assertion of the test now titled `keeps the sections in order, with the read time` in `tests/refresh-render.test.ts`, as task 1.1 names.
 
 **Test arrangement**: the local helpers of `tests/read-time-only.test.ts` are kept local, for the backlog entry `share-the-test-arrangement`.
+
+**Confirmed** by the operator on 2026-11-03, on the board built from `main` at `e9c2235` and run as their `systemd` user service: «все працює, чудово». What was looked at was not reported beyond that, so the placement at either width is unrecorded rather than observed. `dev-task-board` is not yet on npm, so this was run from the clone and not as `npx dev-task-board@0.7.0`.

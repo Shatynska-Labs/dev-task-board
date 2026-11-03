@@ -65,7 +65,7 @@ A workspace's overview SHALL list its projects, each linking to its page, with w
 
 ### Requirement: A project's page shows its document
 
-A read project's page SHALL show, in this order, tasks in work with their stage, active workstreams, other workstreams, and tasks in no workstream, each workstream opening with `<details>` to its steps and to the tasks whose `workstreams` name it but no step holds, marked as unplaced, and the document's `written_at` and the time of the read. Every task in the document SHALL appear. Status, stage and placement SHALL come from the document alone. A page for a failed project SHALL say so, with the reason.
+A read project's page SHALL show, in this order, tasks in work with their stage, active workstreams, other workstreams, and tasks in no workstream, each workstream opening with `<details>` to its steps and to the tasks whose `workstreams` name it but no step holds, marked as unplaced, and the time of the read, as `Read` and its date and time alone, beside the project's name, or under it on a narrow page. The page SHALL NOT show the document's `written_at`, nor the trunk's ref or commit. Every task in the document SHALL appear. Status, stage and placement SHALL come from the document alone. A page for a failed project SHALL say so, with the reason.
 
 #### Scenario: The sections
 
@@ -84,6 +84,12 @@ A read project's page SHALL show, in this order, tasks in work with their stage,
 - **GIVEN** a project read at `2026-11-01T22:18:05.123Z`
 - **WHEN** its page is rendered
 - **THEN** it shows `2026-11-01 22:18:05 UTC`
+
+#### Scenario: Only the time of the read
+
+- **GIVEN** a document with `written_at` `2026-11-01T22:17:44Z` and a trunk of ref `origin/main` and commit `2cc5bd8`, read at `2026-11-01T22:18:05.123Z`
+- **WHEN** its page is rendered
+- **THEN** it shows `Read 2026-11-01 22:18:05 UTC`, and neither `22:17`, `written`, `origin/main` nor `2cc5bd8`
 
 ### Requirement: A partial forge read is noticed
 
