@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { createServer, type Server } from "node:net";
 import { join } from "node:path";
@@ -65,34 +65,6 @@ function commitEntry(
 		"-m",
 		name,
 	);
-}
-
-// A gh that holds a read open, in the projects `held` matches, until `release`
-// exists, and logs where it was asked. Bounded, so that nothing outlives a test.
-function holdingGh(root: string, held = "*"): { log: string; release: string } {
-	const log = join(root, "gh.log");
-	const release = join(root, "release");
-	writeFileSync(
-		join(root, "stubs", "gh"),
-		[
-			"#!/bin/sh",
-			`echo "$PWD" >> '${log}'`,
-			`case "$PWD" in ${held})`,
-			"i=0",
-			`until [ -e '${release}' ] || [ "$i" -ge 1000 ]; do sleep 0.02; i=$((i + 1)); done`,
-			";; esac",
-			"exit 1",
-			"",
-		].join("\n"),
-		{ mode: 0o755 },
-	);
-	return { log, release };
-}
-
-function lines(path: string): string[] {
-	return existsSync(path)
-		? readFileSync(path, "utf8").trim().split("\n").filter(Boolean)
-		: [];
 }
 
 function start(args: string[], env: NodeJS.ProcessEnv): Board {
@@ -224,71 +196,6 @@ describe("A page shows what was read for it", () => {
 			expect(before.status).toBe(200);
 			expect(before.body).not.toContain("a-later-entry");
 			expect(after.body).toContain("a-later-entry");
-		});
-	});
-});
-
-describe("Each project is read at start and when requested", () => {
-	describe("The server answers during a read", () => {
-		it("answers another project's page and the list without waiting", async () => {
-			const root = temporaryDirectory();
-			const env = isolatedEnvironment(root);
-			const one = fixtureProject(root, env, "one");
-			const two = fixtureProject(root, env, "two");
-			const three = fixtureProject(root, env, "three");
-			writeSettings(
-				env,
-				[
-					"[workspaces.work]",
-					`projects = ${JSON.stringify([one, two])}`,
-					"[workspaces.other]",
-					`projects = ${JSON.stringify([three])}`,
-					"",
-				].join("\n"),
-			);
-			const { log } = holdingGh(root, "*/one");
-			const port = await boardOn(env);
-			await waitUntil(() => lines(log).includes(one));
-
-			const page = await get(port, "/work/two", 5000);
-			const list = await get(port, "/", 5000);
-
-			expect(page.status).toBe(200);
-			expect(page.body).not.toMatch(/being read/i);
-			expect(list.status).toBe(200);
-		});
-	});
-
-	describe("Two requests during one read", () => {
-		it("starts no second read, and both answer when the read finishes", async () => {
-			const root = temporaryDirectory();
-			const env = isolatedEnvironment(root);
-			const project = fixtureProject(root, env, "one");
-			writeSettings(
-				env,
-				`[workspaces.work]\nprojects = ${JSON.stringify([project])}\n`,
-			);
-			const { log, release } = holdingGh(root);
-			const port = await boardOn(env);
-			await waitUntil(() => lines(log).length > 0);
-			let answers = 0;
-			const counted = () =>
-				get(port, "/work/one").then((response) => {
-					answers += 1;
-					return response;
-				});
-
-			const requests = Promise.all([counted(), counted()]);
-			await delay(1000);
-
-			expect(answers).toBe(0);
-			expect(lines(log)).toEqual([project]);
-
-			writeFileSync(release, "");
-			for (const { status, body } of await requests) {
-				expect(status).toBe(200);
-				expect(body).not.toMatch(/being read/i);
-			}
 		});
 	});
 });

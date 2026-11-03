@@ -34,6 +34,12 @@ export type ReadOptions = {
 export type Reads = {
 	get(workspace: string, project: string): ProjectState | undefined;
 	refresh(workspace: string, project?: string): Promise<void>;
+	// What git gives with gh unable to log in, never held: undefined where it
+	// failed or the full read beside it ended first.
+	quick(
+		workspace: string,
+		project: string,
+	): Promise<ProjectDocument | undefined>;
 	start(): Promise<void>;
 	stop(): Promise<void>;
 };
@@ -47,6 +53,11 @@ type Run = { limitPassed: boolean } & (
 	  }
 	| { spawnError: string }
 );
+
+type QuickRead = {
+	read: Promise<ProjectDocument | undefined>;
+	stop?: () => Promise<void>;
+};
 
 const KNOWN_SCHEMA = 1;
 // Never a directory, so gh stops before it can read any login.
@@ -113,12 +124,15 @@ export function isFull(document: ProjectDocument): boolean {
 	return document.forge === "full";
 }
 
-export function whatMissed(document: ProjectDocument): string[] {
+export function whatMissed(
+	document: ProjectDocument,
+	{ forge = true }: { forge?: boolean } = {},
+): string[] {
 	const trunk = document.trunk as
 		| { branch?: string; state?: string }
 		| undefined;
 	const missed: string[] = [];
-	if (!isFull(document)) {
+	if (forge && !isFull(document)) {
 		missed.push(`The forge read was ${document.forge}: statuses may be wrong.`);
 	}
 	if (trunk?.state === "fetch_failed") {
@@ -191,6 +205,7 @@ export function createReads(
 	const states = new Map<string, ProjectState>();
 	const running = new Map<number, () => Promise<void>>();
 	const inFlight = new Map<string, Promise<void>>();
+	const quickInFlight = new Map<string, QuickRead>();
 	let stopped = false;
 	let finished: Promise<unknown> = Promise.resolve();
 
@@ -204,6 +219,7 @@ export function createReads(
 		args: string[],
 		environment: NodeJS.ProcessEnv | undefined,
 		limitMs: number,
+		onStop?: (stop: () => Promise<void>) => void,
 	): Promise<Run> {
 		return new Promise((resolve) => {
 			let child: ChildProcessByStdio<null, Readable, Readable>;
@@ -246,6 +262,7 @@ export function createReads(
 			if (child.pid !== undefined) {
 				running.set(child.pid, stop);
 			}
+			onStop?.(stop);
 			const closed = new Promise((closes) => child.once("close", closes));
 			const finish = (run: Run) => {
 				clearTimeout(timer);
@@ -298,12 +315,14 @@ export function createReads(
 		path: string,
 		environment: NodeJS.ProcessEnv | undefined,
 		limitMs: number,
+		onStop?: (stop: () => Promise<void>) => void,
 	): Promise<Run> {
 		return runGroup(
 			"bash",
 			[options.toolPath, "--json", path],
 			environment,
 			limitMs,
+			onStop,
 		);
 	}
 
@@ -369,9 +388,38 @@ export function createReads(
 		const read = readProject(workspace, project).then((outcome) => {
 			states.set(id, settle(states.get(id), outcome, new Date().toISOString()));
 			inFlight.delete(id);
+			void quickInFlight.get(id)?.stop?.();
 		});
 		inFlight.set(id, read);
 		return read;
+	}
+
+	function quickOnce(
+		workspace: Workspace,
+		project: Project,
+	): Promise<ProjectDocument | undefined> {
+		const id = key(workspace.name, project.name);
+		const current = quickInFlight.get(id);
+		if (current !== undefined) {
+			return current.read;
+		}
+		const entry: QuickRead = { read: Promise.resolve(undefined) };
+		entry.read = runTool(
+			project.path,
+			environmentWithNoLogin(),
+			options.limitMs,
+			(stop) => {
+				entry.stop = stop;
+			},
+		).then((run) => {
+			quickInFlight.delete(id);
+			const outcome = outcomeOfTool(run);
+			return outcome.state === "read" && !stopped
+				? outcome.document
+				: undefined;
+		});
+		quickInFlight.set(id, entry);
+		return entry.read;
 	}
 
 	async function readWorkspace(workspace: Workspace): Promise<void> {
@@ -403,6 +451,16 @@ export function createReads(
 				projects.map((project) => readOnce(workspace, project)),
 			);
 		},
+		quick(workspaceName, projectName) {
+			const workspace = workspaces.find(({ name }) => name === workspaceName);
+			const project = workspace?.projects.find(
+				({ name }) => name === projectName,
+			);
+			if (stopped || workspace === undefined || project === undefined) {
+				return Promise.resolve(undefined);
+			}
+			return quickOnce(workspace, project);
+		},
 		start() {
 			const reading = Promise.all(workspaces.map(readWorkspace)).then(
 				() => undefined,
@@ -413,7 +471,11 @@ export function createReads(
 		async stop() {
 			stopped = true;
 			await Promise.all([...running.values()].map((stop) => stop()));
-			await Promise.all([finished, ...inFlight.values()]);
+			await Promise.all([
+				finished,
+				...inFlight.values(),
+				...[...quickInFlight.values()].map(({ read }) => read),
+			]);
 		},
 	};
 }

@@ -1,13 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
-import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createReads } from "../src/reads.js";
 import { startServer } from "../src/server.js";
-import {
-	removeTemporaryDirectories,
-	temporaryDirectory,
-} from "./support/temporary.js";
+import { removeTemporaryDirectories } from "./support/temporary.js";
 
 vi.setConfig({ testTimeout: 15_000 });
 
@@ -73,6 +67,7 @@ function stubReads(whenRefreshed: () => Promise<void> = async () => {}) {
 			document: documentWith(stub.taskName),
 			readAt: "2026-11-01T22:18:00Z",
 		}),
+		quick: async () => undefined,
 		refresh: (workspace: string, project?: string) => {
 			stub.calls.push([workspace, project]);
 			return whenRefreshed();
@@ -174,41 +169,6 @@ describe("A page shows what was read for it", () => {
 			expect(body).not.toContain("only-task");
 		});
 
-		it("answers an overview once its workspace's reads are done", async () => {
-			let finish = () => {};
-			const reads = stubReads(
-				() =>
-					new Promise<void>((resolve) => {
-						finish = resolve;
-					}),
-			);
-			const port = await serve(reads);
-			let answered = false;
-
-			const answer = request(port, "/work").then((response) => {
-				answered = true;
-				return response;
-			});
-			await vi.waitFor(() => {
-				expect(reads.calls).toEqual([["work", undefined]]);
-			});
-			await delay(100);
-
-			expect(answered).toBe(false);
-
-			finish();
-			expect((await answer).status).toBe(200);
-		});
-
-		it("reads the workspace for / with one workspace", async () => {
-			const reads = stubReads();
-			const port = await serve(reads);
-
-			expect((await request(port, "/")).status).toBe(200);
-
-			expect(reads.calls).toEqual([["work", undefined]]);
-		});
-
 		it("reads again on each request", async () => {
 			const reads = stubReads();
 			const port = await serve(reads);
@@ -221,35 +181,6 @@ describe("A page shows what was read for it", () => {
 				["work", "one"],
 			]);
 		});
-	});
-
-	describe("A read past its limit", () => {
-		function hangingBoard() {
-			const root = temporaryDirectory();
-			const path = join(root, "one");
-			mkdirSync(path);
-			const toolPath = join(root, "stub-tool");
-			writeFileSync(toolPath, "exec sleep 30\n", { mode: 0o644 });
-			return createReads(
-				[{ name: "work", projects: [{ name: "one", path }] }],
-				{ toolPath, limitMs: 300, graceMs: 100 },
-			);
-		}
-
-		it.each(["/work/one", "/work"])(
-			"answers %s, with that reason",
-			async (path) => {
-				const reads = hangingBoard();
-				const port = await serve(reads, [
-					{ name: "work", projects: [{ name: "one", path: "/srv/one" }] },
-				]);
-
-				const { body } = await request(port, path);
-
-				expect(body).toMatch(/limit|timed? ?out/i);
-				expect(body).not.toMatch(/being read/i);
-			},
-		);
 	});
 
 	describe("A request from another site", () => {

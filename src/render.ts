@@ -62,7 +62,7 @@ function href(...names: string[]): string {
 
 const STAGES = ["plan", "build", "ship"];
 
-function layout(title: string, body: string): string {
+function layoutStart(title: string): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -72,10 +72,16 @@ function layout(title: string, body: string): string {
 <style>${STYLE}</style>
 </head>
 <body><main>
-${body}
+`;
+}
+
+const LAYOUT_END = `
 </main></body>
 </html>
 `;
+
+function layout(title: string, body: string): string {
+	return `${layoutStart(title)}${body}${LAYOUT_END}`;
 }
 
 function inline(text: unknown): string {
@@ -436,30 +442,28 @@ function written(document: BoardDocument): string {
 	return `<p class="meta">Written ${escapeHtml(when)}${trunk}.</p>`;
 }
 
-export function renderProject(
+function projectHeading(
 	workspaceName: string,
 	projectName: string,
-	state: ProjectState | undefined,
-	workspaceNames: string[] = [],
+	workspaceNames: string[],
 ): string {
-	const nav = tabs(workspaceNames, workspaceName);
 	const way =
-		nav ||
+		tabs(workspaceNames, workspaceName) ||
 		`<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
-	const heading = `${way}<h1>${escapeHtml(projectName)}</h1>`;
+	return `<header>${way}<h1>${escapeHtml(projectName)}</h1></header>\n`;
+}
+
+// One part of a project's page; the style shows only the last one sent.
+function phase(body: string): string {
+	return `<section class="phase">\n${body}\n</section>\n`;
+}
+
+function projectState(state: ProjectState | undefined): string {
 	if (state === undefined || state.state === "reading") {
-		return page(
-			projectName,
-			heading,
-			'<p class="meta">This project is being read.</p>',
-		);
+		return '<p class="meta">This project is being read.</p>';
 	}
 	if (state.state === "failed") {
-		return page(
-			projectName,
-			heading,
-			`<div class="notice">The read failed: ${escapeHtml(state.reason)}</div>`,
-		);
+		return `<div class="notice">The read failed: ${escapeHtml(state.reason)}</div>`;
 	}
 	const document = state.document as BoardDocument;
 	const lines = noticeLines(state.document, state.readAt, state.latest);
@@ -467,11 +471,38 @@ export function renderProject(
 		lines.length > 0
 			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
 			: "";
-	return page(
-		projectName,
-		`${heading}<p class="meta">Read ${readTime(state.readAt)}.</p>${written(document)}`,
-		notice + renderDocument(document),
+	return `<p class="meta">Read ${readTime(state.readAt)}.</p>${written(document)}\n${notice}${renderDocument(document)}`;
+}
+
+// The parts of a project's page, for a server that sends them as reads end.
+export function projectPageStart(
+	workspaceName: string,
+	projectName: string,
+	workspaceNames: string[] = [],
+): string {
+	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${phase('<p class="meta">This project is being read.</p>')}`;
+}
+
+export function quickPart(document: ProjectDocument): string {
+	const others = whatMissed(document, { forge: false })
+		.map((line) => `<span>${escapeHtml(line)}</span>`)
+		.join("");
+	return phase(
+		`<div class="notice"><span>Read from git alone: GitHub is still being read, so statuses may be wrong.</span>${others}</div>\n${renderDocument(document as BoardDocument)}`,
 	);
+}
+
+export function projectPageEnd(state: ProjectState | undefined): string {
+	return `${phase(projectState(state))}${LAYOUT_END}`;
+}
+
+export function renderProject(
+	workspaceName: string,
+	projectName: string,
+	state: ProjectState | undefined,
+	workspaceNames: string[] = [],
+): string {
+	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${projectPageEnd(state)}`;
 }
 
 export function renderNotFound(): string {

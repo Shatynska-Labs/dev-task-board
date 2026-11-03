@@ -49,6 +49,7 @@ const readEverything = {
 		project === "one" || project === "two words"
 			? { state: "read", document, readAt: "2026-11-01T22:18:00Z" }
 			: { state: "reading" },
+	quick: async () => undefined,
 	refresh: async () => {},
 };
 

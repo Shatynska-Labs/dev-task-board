@@ -39,6 +39,7 @@ function recordingReads() {
 			stub.touched.push(workspace);
 			return read;
 		},
+		quick: async () => undefined,
 		refresh: async (workspace: string) => {
 			stub.touched.push(workspace);
 		},

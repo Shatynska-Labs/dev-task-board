@@ -2,10 +2,12 @@ import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Reads } from "./reads.js";
 import {
+	projectPageEnd,
+	projectPageStart,
+	quickPart,
 	renderIndex,
 	renderNotFound,
 	renderOverview,
-	renderProject,
 } from "./render.js";
 import type { Workspace } from "./settings.js";
 
@@ -13,15 +15,43 @@ const HOST = "127.0.0.1";
 
 export type BoardState = {
 	workspaces: Workspace[];
-	reads: Pick<Reads, "get" | "refresh">;
+	reads: Pick<Reads, "get" | "refresh" | "quick">;
+};
+
+const HEADERS = {
+	"content-type": "text/html; charset=utf-8",
+	"cache-control": "no-store",
 };
 
 function answer(response: ServerResponse, status: number, html: string): void {
-	response.writeHead(status, {
-		"content-type": "text/html; charset=utf-8",
-		"cache-control": "no-store",
-	});
+	response.writeHead(status, HEADERS);
 	response.end(html);
+}
+
+// A page sent in parts: a function that writes them as its reads end.
+type Streamed = (response: ServerResponse) => Promise<void>;
+
+function projectPage(
+	workspace: string,
+	project: string,
+	names: string[],
+	reads: BoardState["reads"],
+): Streamed {
+	return async (response) => {
+		response.writeHead(200, HEADERS);
+		response.write(projectPageStart(workspace, project, names));
+		let fullEnded = false;
+		const full = reads.refresh(workspace, project).then(() => {
+			fullEnded = true;
+		});
+		const quick = reads.quick(workspace, project);
+		const document = await Promise.race([quick, full.then(() => undefined)]);
+		if (document !== undefined && !fullEnded) {
+			response.write(quickPart(document));
+		}
+		await full;
+		response.end(projectPageEnd(reads.get(workspace, project)));
+	};
 }
 
 function decodedSegments(url: string): string[] | undefined {
@@ -45,7 +75,7 @@ function fromAnotherSite(site: string | string[] | undefined): boolean {
 async function pageFor(
 	url: string,
 	state: BoardState,
-): Promise<string | undefined> {
+): Promise<string | Streamed | undefined> {
 	const segments = decodedSegments(url);
 	const { workspaces, reads } = state;
 	const names = workspaces.map(({ name }) => name);
@@ -58,7 +88,6 @@ async function pageFor(
 		if (only === undefined || others.length > 0) {
 			return renderIndex(workspaces);
 		}
-		await reads.refresh(only.name);
 		return renderOverview(only, reads, names);
 	}
 	const workspace = workspaces.find(({ name }) => name === first);
@@ -66,19 +95,12 @@ async function pageFor(
 		return undefined;
 	}
 	if (project === undefined) {
-		await reads.refresh(workspace.name);
 		return renderOverview(workspace, reads, names);
 	}
 	if (!workspace.projects.some(({ name }) => name === project)) {
 		return undefined;
 	}
-	await reads.refresh(workspace.name, project);
-	return renderProject(
-		workspace.name,
-		project,
-		reads.get(workspace.name, project),
-		names,
-	);
+	return projectPage(workspace.name, project, names, reads);
 }
 
 export function startServer(
@@ -102,8 +124,10 @@ export function startServer(
 				: undefined;
 		if (page === undefined) {
 			answer(response, 404, renderNotFound());
-		} else {
+		} else if (typeof page === "string") {
 			answer(response, 200, page);
+		} else {
+			await page(response);
 		}
 	});
 	return new Promise((resolve, reject) => {

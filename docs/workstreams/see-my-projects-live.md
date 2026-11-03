@@ -11,7 +11,8 @@
 3. `read-on-refresh` — a page's request reads what it shows and waits for it, with nothing read between requests, and the page shows when the data was read.
 4. `say-what-a-read-missed` — failed, degraded and unknown-version reads: the last document kept, with its age, the reason and what could not be read.
 5. `switch-between-workspaces` — several named workspaces as tabs, and an optional `github_account` for each.
-6. `write-the-settings` — the setup command.
+6. `open-pages-at-once` — an overview drawn from what is held, and a project's page that shows what `git` gives first and the full read after, in one response.
+7. `write-the-settings` — the setup command.
 
 - **Not in scope**: what `README.md`'s Non-Goals name, among them editing tasks from the page and reading uncommitted work.
 - **Open questions**: none
@@ -23,4 +24,4 @@ The board's scope, architecture and failure rules are in `README.md`. Status, st
 
 ## Decisions
 
-**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script, at the cost of waiting for the read on each request.
+**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`; revised with `open-pages-at-once`, 2026-11-03. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script. A project's page is sent in parts as its reads end, so the wait shows what `git` gives first, and an overview reads nothing, since it is used to move between projects.
