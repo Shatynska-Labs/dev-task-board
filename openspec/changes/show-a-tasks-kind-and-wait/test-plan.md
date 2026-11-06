@@ -112,3 +112,7 @@ The dispatch named `tests/support/`. It holds `build.ts` (global build setup), `
 - **`fullDocument()`**: stands in for a `schema_version` 1 document. Used by every test. Near-miss: none. Found in `tests/render.test.ts`. Proposed home: `tests/support/document.ts`.
 - **`page()` and `loosePage()`**: a `read` `ProjectState` passed to `renderProject`. Used by every test. Near-miss: none. Found in `tests/render.test.ts` as `read()` and `page()`. Proposed home: `tests/support/document.ts`.
 - **HTML reading helpers** (`decode`, `textOf`, `expectInOrder`, `blocks`, `rowOf`, `rowText`, `enclosing`, `selectorsDeclaring`, `takesRule`, `struckThrough`, `titlesAround`, `titlesIn`, `rowUpToName`, `streamHead`): stand in for reading what a page shows. Used by every test. Near-miss: none. `textOf`, `expectInOrder` and the `<details>` block walk were found in `tests/render.test.ts`. This file's `textOf` also decodes entities. Proposed home: `tests/support/page.ts`.
+
+### Disposition
+
+All entries above are **promoted**, on 2026-11-06, during build: the document builders (`Task`, `task`, `step`, `workstream`, `fullDocument`, `page`, `loosePage`) to `tests/support/document.ts` and the page-reading helpers to `tests/support/page.ts`, moved verbatim and exported. `tests/kind-and-wait-render.test.ts` now imports them; only its imports changed, no assertion. The older copies in `tests/render.test.ts` and its siblings are left as they are: moving those tests is outside this change.
