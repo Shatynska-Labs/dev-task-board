@@ -16,7 +16,7 @@ In use, the board does not show whether a task is a fix or a change, how much it
 - `waits_on` leaves the task's notes, since the Waits column shows it.
 - A parked task shows `parked` in Waits instead of a `parked` tag beside its name; `high` keeps its tag.
 - A workstream's summary gains a line counting its open steps: must left, ready, blocked by a task, waiting for your decision, waiting for someone else, and parked, each count shown only where it is not zero.
-- Below 640px the new columns fold under the task, as the existing ones do. Pages still carry no script, and every value stays escaped.
+- Below 640px the new columns fold under the task. Pages still carry no script, and every value stays escaped.
 - The version rises to `0.8.0`, since the pages change visibly.
 
 ## Capabilities

@@ -24,19 +24,13 @@ On a project's page, each row of a task in a workstream or in no workstream SHAL
 
 ### Requirement: A task's row shows what it waits on
 
-A row's `Waits` SHALL show `ready` where the task's `readiness` is `ready`, beside a mark, struck through, for each name in `waits_on_done`, so that a wait already met stays visible until its entry is updated. Otherwise it SHALL show one mark per name in `waits_on`, struck through where `waits_on_done` holds it; one mark per value in `waits_for_type`, reading `your decision` for `decision`; one mark where `waits_for` is set and `waits_for_type` is empty; a `parked` mark where `priority` is `parked`; and the `waits_for` condition, cut to one line and given in full as a title. A done task SHALL show nothing under `Waits`.
+A row's `Waits` SHALL show `ready` where the task's `readiness` is `ready`. Otherwise it SHALL show one mark per name in `waits_on`, struck through where `waits_on_done` holds it; one mark per value in `waits_for_type`, reading `your decision` for `decision`; one mark where `waits_for` is set and `waits_for_type` is empty; a `parked` mark where `priority` is `parked`; and the `waits_for` condition, cut to one line and given in full as a title. A done task SHALL show nothing under `Waits`.
 
 #### Scenario: A ready task
 
 - **GIVEN** a task with `readiness` `ready` and nothing in `waits_on` or `waits_for`
 - **WHEN** its project's page is rendered
 - **THEN** its row shows `ready`
-
-#### Scenario: A wait already met
-
-- **GIVEN** a task with `waits_on` `["a"]`, `waits_on_done` `["a"]`, no `waits_for` and `readiness` `ready`
-- **WHEN** its project's page is rendered
-- **THEN** its row shows `ready` and `a` struck through
 
 #### Scenario: Waits on names, one done
 
@@ -61,6 +55,16 @@ A row's `Waits` SHALL show `ready` where the task's `readiness` is `ready`, besi
 - **GIVEN** a task with `waits_on` `["<b>x</b>"]` and `waits_for` `<i>y</i>`
 - **WHEN** its project's page is rendered
 - **THEN** both appear as text
+
+### Requirement: A wait already met stays visible
+
+Beside `ready`, a row SHALL show a mark, struck through, for each name in `waits_on_done`, so that a wait already met stays visible until its entry is updated.
+
+#### Scenario: A wait already met
+
+- **GIVEN** a task with `waits_on` `["a"]`, `waits_on_done` `["a"]`, no `waits_for` and `readiness` `ready`
+- **WHEN** its project's page is rendered
+- **THEN** its row shows `ready` and `a` struck through
 
 ### Requirement: A wait is shown once
 

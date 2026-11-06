@@ -6,7 +6,7 @@
 
 ## 2. Rows
 
-- [ ] 2.1 In `src/render.ts`, add the task's new keys to `Task`, the `Kind`, `Need` and `Waits` cells to `taskRow` and to the row head, drop `waits_on` from `taskNotes`, drop the `parked` tag while keeping other non-`normal` priorities, and mark a `could` row as dimmed; verify with the derived tests for "A task's row shows its kind and need", "A task's row shows what it waits on" and "A wait is shown once".
+- [ ] 2.1 In `src/render.ts`, add the task's new keys to `Task`, the `Kind`, `Need` and `Waits` cells to `taskRow` and to the row head, drop `waits_on` from `taskNotes`, drop the `parked` tag while keeping other non-`normal` priorities, and mark a `could` row as dimmed; verify with the derived tests for "A task's row shows its kind and need", "A task's row shows what it waits on", "A wait already met stays visible" and "A wait is shown once".
 - [ ] 2.2 In `src/style.ts`, add the grid columns, chips, colours (light and dark), the dimmed `could` row and the fold below 640px; verify by rendering a fixture page and looking at it at desktop and phone width.
 
 ## 3. Workstream counts
