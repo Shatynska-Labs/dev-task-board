@@ -435,6 +435,11 @@ function read_entry(n,   f, l, st, b, k, v, raw) {
       else if (k == "workstream") EWS[n] = v
       else if (k == "summary") ESUM[n] = unquote(v)
       else if (k == "waits_on") { gsub(/[\[\]]/, "", v); EWAIT[n] = v }
+      else if (k == "kind") EKIND[n] = v
+      else if (k == "need") ENEED[n] = v
+      else if (k == "waits_for") EWFOR[n] = unquote(v)
+      else if (k == "waits_for_type") { gsub(/[\[\]]/, "", v); EWTYPE[n] = v }
+      else if (k == "parked_until") EPUNT[n] = unquote(v)
       continue
     }
     if (l != "") b = b "<p class=\"full\">" inline((l ~ /^- /) ? substr(l, 3) : l) "</p>\n"
@@ -446,6 +451,28 @@ function read_entry(n,   f, l, st, b, k, v, raw) {
   EBODY[n] = b
   sub(/\n+$/, "", raw)
   ERAW[n] = raw
+}
+# The names of a list value, split on commas and spaces into a.
+function names(v, a,   t) { t = v; gsub(/,/, " ", t); return split(t, a, " ") }
+# A name in waits_on that is not done, and that a forge read short of full
+# could have missed as a merged fix, having no change of its own.
+function unchecked_wait(x) {
+  return status(x) != "done" && FORGE != "full" && !(x in OPEN) && !(x in ARCH)
+}
+# Records each entry's waits not checked as its warnings, counted once.
+function check_waits(n,   w, c, i) {
+  if (!(n in EWAIT)) return
+  c = names(EWAIT[n], w)
+  for (i = 1; i <= c; i++) if (unchecked_wait(w[i])) { UNCHK[n, ++NUNCHK[n]] = w[i]; W_N++ }
+}
+function unchecked_text(x) { return "waits on " x ", not checked against every merged pull request" }
+function readiness(n,   s, w, c, i) {
+  s = status(n)
+  if (s == "done" || s == "flight") return ""
+  if (n in EWAIT) { c = names(EWAIT[n], w); for (i = 1; i <= c; i++) if (status(w[i]) != "done") return "blocked" }
+  if ((n in EWFOR) && EWFOR[n] != "") return "waiting"
+  if ((n in EPRI) && EPRI[n] == "parked") return "parked"
+  return "ready"
 }
 function read_ws(i, n,   f, l, v, in_steps, s, name, desc) {
   f = ENVIRON["TB_TREE"] "/docs/workstreams/" n ".md"
@@ -485,16 +512,31 @@ function unchecked(n) {
 }
 function label(s) { return (s == "flight") ? "in flight" : s }
 function cls(s) { return (s == "recorded") ? "" : s }
-function row(n, desc, unplaced,   s, x, m) {
+# The page's waits_on names, a done one marked so.
+function waitlist(n,   w, c, i, o) {
+  c = names(EWAIT[n], w); o = ""
+  for (i = 1; i <= c; i++) o = o (i > 1 ? ", " : "") esc(w[i]) ((status(w[i]) == "done") ? " (done)" : "")
+  return o
+}
+function typelist(v,   w, c, i, o) {
+  c = names(v, w); o = ""
+  for (i = 1; i <= c; i++) o = o (i > 1 ? ", " : "") w[i]
+  return o
+}
+function row(n, desc, unplaced,   s, x, m, i) {
   s = status(n)
   x = "<span class=\"name\">" esc(n) "</span>"
   if (n in STAGE) x = x "<span class=\"stage-inline\">" esc(STAGE[n]) "</span>"
   if ((n in EPRI) && EPRI[n] != "normal") x = x "<span class=\"tag\">" esc(EPRI[n]) "</span>"
+  if (n in EKIND) x = x "<span class=\"tag\">" esc(EKIND[n]) "</span>"
+  if ((n in ENEED) && ENEED[n] != "should") x = x "<span class=\"tag\">" esc(ENEED[n]) "</span>"
   if (unplaced) x = x "<span class=\"tag\">unplaced</span>"
   if (unchecked(n) || ((n in STAGE) && FORGE != "full")) x = x "<span class=\"mark\">merge not checked</span>"
   if (desc != "") x = x "<p class=\"desc\">" inline(desc) "</p>"
   if (n in ESUM) x = x "<p class=\"desc\">" inline(ESUM[n]) "</p>"
-  if (n in EWAIT && EWAIT[n] != "") x = x "<p class=\"desc\">Waits on " esc(EWAIT[n]) "</p>"
+  if (n in EWAIT && EWAIT[n] != "") x = x "<p class=\"desc\">Waits on " waitlist(n) "</p>"
+  if ((n in EWFOR) && EWFOR[n] != "") x = x "<p class=\"desc\">Waits for " (((n in EWTYPE) && EWTYPE[n] != "") ? esc(typelist(EWTYPE[n])) ": " : "") esc(EWFOR[n]) "</p>"
+  for (i = 1; i <= NUNCHK[n]; i++) x = x warn(unchecked_text(UNCHK[n, i]))
   if (n in NOTE) x = x "<p class=\"desc\">Names " esc(NOTE[n]) ", which is not open</p>"
   if (n in ENOFM) x = x warn("no frontmatter")
   if ((n in STEP) && STEP[n] > 1) x = x warn("also a step of another workstream")
@@ -611,7 +653,7 @@ function jlist(a, c,   i, o) {
   return "[" o "]"
 }
 function jbool(v) { return v ? "true" : "false" }
-function jtask(n,   s, p, c, w, cw, g, cg, i, t) {
+function jtask(n,   s, p, c, w, cw, g, cg, i, t, ty, ct, dn, cd, wn, cn, rd) {
   s = status(n)
   c = 0
   if (n in STEP) p[++c] = "step"
@@ -628,6 +670,13 @@ function jtask(n,   s, p, c, w, cw, g, cg, i, t) {
   if (n in EWAIT) {
     t = EWAIT[n]; gsub(/,/, " ", t); cw = split(t, w, " ")
   }
+  cd = 0
+  for (i = 1; i <= cw; i++) if (status(w[i]) == "done") dn[++cd] = w[i]
+  ct = (n in EWTYPE) ? names(EWTYPE[n], ty) : 0
+  cn = 0
+  if (n in ENOFM) wn[++cn] = "no frontmatter"
+  for (i = 1; i <= NUNCHK[n]; i++) wn[++cn] = unchecked_text(UNCHK[n, i])
+  rd = readiness(n)
   return "{\"name\":" jstr(n) \
     ",\"status\":" jstr((s == "flight") ? "in_flight" : s) \
     ",\"stage\":" ((n in STAGE) ? jstr(STAGE[n]) : "null") \
@@ -639,9 +688,16 @@ function jtask(n,   s, p, c, w, cw, g, cg, i, t) {
     ",\"summary\":" ((n in ESUM) ? jstr(ESUM[n]) : "null") \
     ",\"priority\":" (((n in EPRI) && EPRI[n] != "normal") ? jstr(EPRI[n]) : "null") \
     ",\"waits_on\":" jlist(w, cw) \
+    ",\"kind\":" ((n in EKIND) ? jstr(EKIND[n]) : "null") \
+    ",\"need\":" ((n in ENEED) ? jstr(ENEED[n]) : (n in EPRI) ? "\"should\"" : "null") \
+    ",\"waits_for\":" ((n in EWFOR) ? jstr(EWFOR[n]) : "null") \
+    ",\"waits_for_type\":" jlist(ty, ct) \
+    ",\"parked_until\":" ((n in EPUNT) ? jstr(EPUNT[n]) : "null") \
+    ",\"waits_on_done\":" jlist(dn, cd) \
+    ",\"readiness\":" ((rd != "") ? jstr(rd) : "null") \
     ",\"body\":" ((n in ERAW) ? jstr(ERAW[n]) : "null") \
     ",\"merge_unchecked\":" jbool(unchecked(n) || ((n in STAGE) && FORGE != "full")) \
-    ",\"warnings\":" ((n in ENOFM) ? "[\"no frontmatter\"]" : "[]") "}"
+    ",\"warnings\":" jlist(wn, cn) "}"
 }
 function jws(i,   j, s, w, c, t) {
   s = ""
@@ -677,6 +733,7 @@ BEGIN {
   for (i = 1; i <= NW; i++) read_ws(i, WN[i])
   c = loadlist(W "/entries", EL)
   for (i = 1; i <= c; i++) read_entry(EL[i])
+  for (i = 1; i <= c; i++) check_waits(EL[i])
   NL = 0
   for (i = 1; i <= c; i++) place(EL[i])
   c = loadlist(W "/open", OL)
