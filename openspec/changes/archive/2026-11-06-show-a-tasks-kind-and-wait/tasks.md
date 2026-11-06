@@ -21,3 +21,7 @@
 
 - Confirm with `npx dev-task-board@0.8.0` on commerce-ops once published.
 - At archive, delete `docs/backlog/show-a-tasks-kind-and-wait.md`.
+
+## 5. Confirm
+
+- [x] 5.1 Confirmed by the operator on 2026-11-06 ("спрацювало"), on `0.8.0` run from the merged trunk as `node dist/cli.js` on port 8766, since the package is not yet published and `npx dev-task-board@0.8.0` could not be run: commerce-ops's page showed the Kind, Need and Waits columns on workstream and loose rows and each workstream's count line. `need` other than `should` and `waits_for_type` are absent there until commerce-ops takes ai-toolkit's backlog rules `1.2.0`.
