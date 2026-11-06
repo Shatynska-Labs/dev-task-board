@@ -24,6 +24,13 @@ type Task = {
 	parts?: string[];
 	waits_on?: string[];
 	warnings?: string[];
+	kind?: string | null;
+	need?: string | null;
+	waits_for?: string | null;
+	waits_for_type?: string[];
+	parked_until?: string | null;
+	waits_on_done?: string[];
+	readiness?: string | null;
 };
 
 type Step = { name: string; description?: string | null };
@@ -132,7 +139,6 @@ function taskNotes(task: Task, description?: string | null): string {
 	return [
 		description,
 		task.summary,
-		task.waits_on?.length ? `Waits on ${task.waits_on.join(", ")}` : null,
 		task.closed_workstream
 			? `Names ${task.closed_workstream}, which is not open`
 			: null,
@@ -150,6 +156,72 @@ function taskBody(body: string): string {
 		.join("\n");
 }
 
+// Classes come from these sets alone; any other value is shown as text.
+const KINDS = new Set(["fix", "change"]);
+const NEEDS = new Set(["must", "should", "could"]);
+const WAIT_TYPES = new Set([
+	"decision",
+	"answer",
+	"access",
+	"release",
+	"event",
+]);
+
+function chip(base: string, value: string, known: Set<string>): string {
+	const kind = known.has(value) ? ` ${value}` : "";
+	return `<span class="${base}${kind}">${escapeHtml(value)}</span>`;
+}
+
+function kindCell(task: Task): string {
+	return task.status !== "done" && task.kind
+		? chip("kind", task.kind, KINDS)
+		: "<span></span>";
+}
+
+function needCell(task: Task): string {
+	return task.status !== "done" && task.need
+		? chip("need", task.need, NEEDS)
+		: "<span></span>";
+}
+
+function waitsCell(task: Task): string {
+	if (task.status === "done") {
+		return "<span></span>";
+	}
+	const done = new Set(task.waits_on_done ?? []);
+	const condition = task.waits_for ?? "";
+	const title = condition ? ` title="${escapeHtml(condition)}"` : "";
+	const names = (task.waits_on ?? []).map(
+		(name) =>
+			`<span class="wchip name${done.has(name) ? " stale" : ""}">${escapeHtml(name)}</span>`,
+	);
+	const types = task.waits_for_type ?? [];
+	const typed = types.map((type) => {
+		const known = WAIT_TYPES.has(type) ? ` ${type}` : "";
+		const label = type === "decision" ? "your decision" : type;
+		return `<span class="wchip${known}"${title}>${escapeHtml(label)}</span>`;
+	});
+	const untyped =
+		condition && types.length === 0
+			? [`<span class="wchip"${title}>waits for</span>`]
+			: [];
+	const parked =
+		task.priority === "parked"
+			? [
+					`<span class="wchip parked"${task.parked_until ? ` title="${escapeHtml(task.parked_until)}"` : ""}>parked</span>`,
+				]
+			: [];
+	const ready =
+		task.readiness === "ready" ? ['<span class="ready">ready</span>'] : [];
+	const marks = [...ready, ...names, ...typed, ...untyped, ...parked];
+	const note = condition
+		? `<span class="wnote"${title}>${escapeHtml(condition)}</span>`
+		: "";
+	return marks.length > 0 || note
+		? `<span class="waits">${marks.join("")}${note}</span>`
+		: "<span></span>";
+}
+
 function taskRow(
 	task: Task,
 	now: number,
@@ -159,20 +231,22 @@ function taskRow(
 		task.stage && `<span class="stage-inline">${escapeHtml(task.stage)}</span>`,
 		task.priority &&
 			task.priority !== "normal" &&
+			task.priority !== "parked" &&
 			`<span class="tag">${escapeHtml(task.priority)}</span>`,
 		options.unplaced && '<span class="tag">unplaced</span>',
 		task.merge_unchecked && '<span class="mark">merge not checked</span>',
 	]
 		.filter(Boolean)
 		.join("");
-	const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div><span class="ago">${age(task, now)}</span>`;
+	const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div>${kindCell(task)}${needCell(task)}${waitsCell(task)}<span class="ago">${age(task, now)}</span>`;
+	const could = task.status !== "done" && task.need === "could" ? " could" : "";
 	return task.body
-		? `<li class="step"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
-		: `<li class="step rowgrid">${line}<span></span></li>\n`;
+		? `<li class="step${could}"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
+		: `<li class="step rowgrid${could}">${line}<span></span></li>\n`;
 }
 
 const ROW_HEAD =
-	'<li class="rowgrid rowhead"><span>Status</span><span>Task</span><span>Last commit</span><span>Details</span></li>\n';
+	'<li class="rowgrid rowhead"><span>Status</span><span>Task</span><span>Kind</span><span>Need</span><span>Waits</span><span>Last commit</span><span>Details</span></li>\n';
 
 function chevron(): string {
 	return '<span class="chev" aria-hidden="true">▶</span>';
@@ -188,6 +262,43 @@ function progress(steps: Task[], unplaced: Task[]): string {
 		.join("");
 	const words = `${done} of ${steps.length} done${flying > 0 ? `, ${flying} in work` : ""}`;
 	return `<div class="progress" style="--steps: ${steps.length}"><div class="bar">${bar}</div><span>${words}</span></div>`;
+}
+
+// Open steps by what holds them, as the tool's readiness gives it.
+function openCounts(steps: Task[]): string {
+	const open = steps.filter((task) => task.status !== "done");
+	const count = (test: (task: Task) => boolean) => open.filter(test).length;
+	const decides = (task: Task) =>
+		(task.waits_for_type ?? []).includes("decision");
+	const slots: [number, string, string][] = [
+		[count((task) => task.need === "must"), "must left", "must"],
+		[count((task) => task.readiness === "ready"), "ready", "ready"],
+		[
+			count((task) => task.readiness === "blocked"),
+			"blocked by a task",
+			"blocked",
+		],
+		[
+			count((task) => task.readiness === "waiting" && decides(task)),
+			"wait for your decision",
+			"decision",
+		],
+		[
+			count((task) => task.readiness === "waiting" && !decides(task)),
+			"wait for someone else",
+			"waiting",
+		],
+		[count((task) => task.readiness === "parked"), "parked", "parked"],
+	];
+	const shown = slots
+		.filter(([number]) => number > 0)
+		.map(
+			([number, words, kind]) =>
+				`<span class="cnt ${kind}"><b>${number}</b> ${words}</span>`,
+		);
+	return shown.length > 0
+		? `<div class="sub counts-line">${shown.join("")}</div>`
+		: "";
 }
 
 function renderStream(stream: Stream, tasks: Task[], now: number): string {
@@ -218,7 +329,7 @@ function renderStream(stream: Stream, tasks: Task[], now: number): string {
 	const summary = stream.summary
 		? `<div class="sub">${inline(stream.summary)}</div>`
 		: "";
-	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}</div>${progress(stepTasks, unplaced)}</summary>
+	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}${openCounts(stepTasks)}</div>${progress(stepTasks, unplaced)}</summary>
 <div class="body">
 ${about}${warnings(stream.warnings)}<ol class="steps">
 ${ROW_HEAD}${[...rows, ...unplaced.map((task) => taskRow(task, now, { unplaced: true }))].join("")}</ol>

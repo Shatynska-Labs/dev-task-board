@@ -1,0 +1,87 @@
+--- dist/render.js	2026-11-03 15:13:56.427233729 +0000
++++ /tmp/claude-1000/-home-shatynska-projects-shatynska-dev-task-board/3e77aed3-e8f1-4a97-a8c1-2a6bdf087f63/scratchpad/proto/render.js	2026-11-05 21:09:38.410455888 +0000
+@@ -72,7 +72,7 @@
+     return [
+         description,
+         task.summary,
+-        task.waits_on?.length ? `Waits on ${task.waits_on.join(", ")}` : null,
++        null,
+         task.closed_workstream
+             ? `Names ${task.closed_workstream}, which is not open`
+             : null,
+@@ -88,23 +88,47 @@
+         .map((line) => `<p class="full">${inline(line.replace(/^- /, ""))}</p>`)
+         .join("\n");
+ }
++const KIND_ONLY_IN_ENTRY = "no entry";
++function waitsCell(task) {
++    const chips = [];
++    for (const w of task.waits_on_status ?? []) {
++        chips.push(`<span class="wchip name ${w.done ? "stale" : ""}" title="${w.done ? "already done: this wait is stale" : "status: " + escapeHtml(w.status)}">${escapeHtml(w.name)}</span>`);
++    }
++    for (const t of task.waits_for_types ?? []) {
++        chips.push(`<span class="wchip ${t}" title="${escapeHtml(task.waits_for ?? "")}">${t === "decision" ? "your decision" : t}</span>`);
++    }
++    if (task.priority === "parked") {
++        chips.push(`<span class="wchip parked" title="${escapeHtml(task.parked_until ?? "")}">parked</span>`);
++    }
++    const note = task.waits_note ? `<span class="wnote">${escapeHtml(task.waits_note)}</span>` : "";
++    if (chips.length === 0) {
++        return task.status === "done" ? '<span class="wnone"></span>' : '<span class="ready">ready</span>';
++    }
++    return `<span class="waits">${chips.join("")}${note}</span>`;
++}
++function kindCell(task) {
++    if (task.status === "done" || !task.kind) return '<span class="dim">—</span>';
++    return `<span class="kind ${task.kind}">${task.kind}</span>`;
++}
++function needCell(task) {
++    if (task.status === "done" || !task.need) return '<span class="dim">—</span>';
++    return `<span class="need ${task.need}">${task.need}</span>`;
++}
+ function taskRow(task, now, options = {}) {
+     const marks = [
+         task.stage && `<span class="stage-inline">${escapeHtml(task.stage)}</span>`,
+-        task.priority &&
+-            task.priority !== "normal" &&
+-            `<span class="tag">${escapeHtml(task.priority)}</span>`,
+         options.unplaced && '<span class="tag">unplaced</span>',
+         task.merge_unchecked && '<span class="mark">merge not checked</span>',
+     ]
+         .filter(Boolean)
+         .join("");
+-    const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div><span class="ago">${age(task, now)}</span>`;
++    const cls = task.status !== "done" && task.need === "could" ? " could" : "";
++    const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div>${kindCell(task)}${needCell(task)}${waitsCell(task)}<span class="ago">${age(task, now)}</span>`;
+     return task.body
+-        ? `<li class="step"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
+-        : `<li class="step rowgrid">${line}<span></span></li>\n`;
++        ? `<li class="step${cls}"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
++        : `<li class="step rowgrid${cls}">${line}<span></span></li>\n`;
+ }
+-const ROW_HEAD = '<li class="rowgrid rowhead"><span>Status</span><span>Task</span><span>Last commit</span><span>Details</span></li>\n';
++const ROW_HEAD = '<li class="rowgrid rowhead"><span>Status</span><span>Task</span><span>Kind</span><span>Need</span><span>Waits</span><span>Last commit</span><span>Details</span></li>\n';
+ function chevron() {
+     return '<span class="chev" aria-hidden="true">▶</span>';
+ }
+@@ -134,9 +158,17 @@
+         .filter(([, text]) => text)
+         .map(([title, text]) => `<p class="def"><strong>${title}:</strong> ${inline(text)}</p>`)
+         .join("\n");
+-    const summary = stream.summary
+-        ? `<div class="sub">${inline(stream.summary)}</div>`
+-        : "";
++    const open = stepTasks.filter((t) => t.status !== "done");
++    const n = (f) => open.filter(f).length;
++    const slots = [
++        [n((t) => t.need === "must"), "must left", "must"],
++        [n((t) => t.readiness === "ready"), "ready", "ready"],
++        [n((t) => t.readiness === "blocked"), "blocked by a task", "blocked"],
++        [n((t) => (t.waits_for_types ?? []).includes("decision")), "wait for your decision", "decision"],
++        [n((t) => t.readiness === "waiting" && !(t.waits_for_types ?? []).includes("decision")), "wait for someone else", "waiting"],
++        [n((t) => t.readiness === "parked"), "parked", "parked"],
++    ].filter(([c]) => c > 0).map(([c, w, k]) => `<span class="cnt ${k}"><b>${c}</b> ${w}</span>`).join("");
++    const summary = `<div class="sub counts-line">${slots}</div>`;
+     return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}</div>${progress(stepTasks, unplaced)}</summary>
+ <div class="body">
+ ${about}${warnings(stream.warnings)}<ol class="steps">

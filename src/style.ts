@@ -10,7 +10,7 @@ export const STYLE = `
   --bg: #12191e; --panel: #1a242a; --fg: #e4ebee; --muted: #93a3ac; --line: #2e3c44;
   --done: #5bb78f; --work: #7fb0f5; --work-soft: #1f3250; --warn: #e3a955; --warn-soft: #3c2e17; color-scheme: dark } }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5 }
-main { max-width: 900px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
+main { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
 .stamp { color: var(--muted); font-size: 12px; margin: 0; overflow-wrap: anywhere }
 /* Level with the name: up by main's gap (32px) and the heading's line (36px),
    measured from the top of the part, so the tabs above never move it. */
@@ -68,7 +68,7 @@ details[open] > summary .chev { transform: rotate(90deg) }
 .def { margin: 0; font-size: 14px; max-width: 70ch }
 .def strong { color: var(--muted); font-weight: 600 }
 ol.steps, ul.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
-.rowgrid, details.task > summary { display: grid; grid-template-columns: 96px minmax(0, 1fr) 76px 56px; gap: 10px; align-items: start }
+.rowgrid, details.task > summary { display: grid; grid-template-columns: 96px minmax(0, 1fr) 58px 58px 210px 76px 56px; gap: 10px; align-items: start }
 details.task > summary { list-style: none; cursor: pointer }
 .rowhead { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px }
 .st { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; height: 21px; color: var(--muted) }
@@ -90,11 +90,41 @@ details[open].task .more::before { content: "hide" }
   .workhead, .rowhead { display: none }
   details.group > summary { grid-template-columns: 14px minmax(0, 1fr) }
   .progress { grid-column: 2; text-align: left; width: auto }
-  .rowgrid, details.task > summary { grid-template-columns: minmax(0, 1fr) auto auto; gap: 2px 10px }
+  .rowgrid, details.task > summary { grid-template-columns: auto auto minmax(0, 1fr); gap: 4px 10px }
   .st { grid-column: 1 / -1 }
+  .rowgrid > div, details.task > summary > div { grid-column: 1 / -1 }
   .full { margin-left: 0 }
 }
 a { color: var(--work) }
+/* A task's kind, need and wait, as the operator accepted them on 2026-11-05. */
+.kind, .need { font-size: 11px; font-family: var(--mono); border-radius: 3px; padding: 1px 6px; height: 19px; display: inline-flex; align-items: center; justify-self: start; margin-top: 1px; color: var(--muted); border: 1px solid var(--line) }
+.kind.fix { color: var(--done); border-color: var(--done) }
+.kind.change { color: var(--work); background: var(--work-soft); border-color: transparent }
+.need.must { color: var(--fg); font-weight: 700; border-color: var(--fg) }
+.need.could { border-style: dashed }
+li.could .name, li.could .desc { opacity: .55 }
+.waits .ready { font-size: 12px; color: var(--done); font-weight: 600 }
+.waits { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; min-width: 0 }
+.wnote { font-size: 11.5px; color: var(--muted); width: 100%; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.wchip { font-size: 11px; border-radius: 10px; padding: 0 7px; line-height: 18px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); border: 1px solid var(--line) }
+.wchip.name { font-family: var(--mono); background: var(--work-soft); color: var(--work); border-color: transparent }
+.wchip.name.stale { text-decoration: line-through; background: none; border-color: var(--line); color: var(--muted) }
+.wchip.decision { background: #d5eff1; color: #0b6e78; font-weight: 600; border-color: transparent }
+.wchip.answer { background: var(--warn-soft); color: var(--warn); border-color: transparent }
+.wchip.access { background: #e3e8ec; color: #45555f; border-color: transparent }
+.wchip.release, .wchip.event { background: #dff1ea; color: var(--done); border-color: transparent }
+.wchip.parked { border: 1px dashed var(--muted) }
+.counts-line { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline }
+.cnt { font-size: 12px; line-height: 18px; white-space: nowrap }
+.cnt b { font-weight: 600 }
+.cnt.must { color: var(--fg) } .cnt.ready { color: var(--done) } .cnt.blocked { color: var(--work) }
+.cnt.decision { color: #0b7d88 } .cnt.waiting { color: var(--warn) } .cnt.parked { color: var(--muted) }
+@media (prefers-color-scheme: dark) {
+  .wchip.decision { background: #12393d; color: #8fdde4 }
+  .wchip.access { background: #2a343b; color: #b4c2cb }
+  .wchip.release, .wchip.event { background: #183a2c }
+  .cnt.decision { color: #8fdde4 }
+}
 .notice a { color: inherit }
 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; padding: 12px 14px }
 .row + .row { border-top: 1px solid var(--line) }
