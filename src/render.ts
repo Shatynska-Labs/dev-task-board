@@ -225,7 +225,11 @@ function waitsCell(task: Task): string {
 function taskRow(
 	task: Task,
 	now: number,
-	options: { description?: string | null; unplaced?: boolean } = {},
+	options: {
+		description?: string | null;
+		unplaced?: boolean;
+		number?: number;
+	} = {},
 ): string {
 	const marks = [
 		task.stage && `<span class="stage-inline">${escapeHtml(task.stage)}</span>`,
@@ -238,11 +242,16 @@ function taskRow(
 	]
 		.filter(Boolean)
 		.join("");
-	const line = `${statusMark(task.status)}<div><span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div>${kindCell(task)}${needCell(task)}${waitsCell(task)}<span class="ago">${age(task, now)}</span>`;
+	const line = `${statusMark(task.status)}<div>${stepNumber(options.number)}<span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div>${kindCell(task)}${needCell(task)}${waitsCell(task)}<span class="ago">${age(task, now)}</span>`;
 	const could = task.status !== "done" && task.need === "could" ? " could" : "";
 	return task.body
 		? `<li class="step${could}"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
 		: `<li class="step rowgrid${could}">${line}<span></span></li>\n`;
+}
+
+// A step's position in its workstream, as the workstream file numbers it.
+function stepNumber(number: number | undefined): string {
+	return number === undefined ? "" : `<span class="num">${number}.</span>`;
 }
 
 const ROW_HEAD =
@@ -303,11 +312,11 @@ function openCounts(steps: Task[]): string {
 
 function renderStream(stream: Stream, tasks: Task[], now: number): string {
 	const stepNames = new Set(stream.steps.map((step) => step.name));
-	const rows = stream.steps.map((step) => {
+	const rows = stream.steps.map((step, index) => {
 		const task = tasks.find((entry) => entry.name === step.name);
 		return task
-			? taskRow(task, now, { description: step.description })
-			: `<li class="step"><span class="name">${escapeHtml(step.name)}</span></li>\n`;
+			? taskRow(task, now, { description: step.description, number: index + 1 })
+			: `<li class="step">${stepNumber(index + 1)}<span class="name">${escapeHtml(step.name)}</span></li>\n`;
 	});
 	const unplaced = tasks.filter(
 		(task) =>

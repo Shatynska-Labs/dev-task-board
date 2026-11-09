@@ -70,6 +70,7 @@ details[open] > summary .chev { transform: rotate(90deg) }
 ol.steps, ul.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
 .rowgrid, details.task > summary { display: grid; grid-template-columns: 96px minmax(0, 1fr) 58px 58px 210px 76px 56px; gap: 10px; align-items: start }
 details.task > summary { list-style: none; cursor: pointer }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px }
 .rowhead { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px }
 .st { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; height: 21px; color: var(--muted) }
 .st::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box; flex: none }
