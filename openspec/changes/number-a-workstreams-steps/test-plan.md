@@ -102,3 +102,7 @@ The dispatch named `tests/support/` as the shared arrangement. Its builders (`ta
 - **Which stack skill applies.** The library has no TypeScript or vitest skill, so the tests were written to the testing floor alone, following the idiom of `tests/kind-and-wait-render.test.ts`. Every test depends on this.
 - **How the in-work row is marked up.** `AGENTS.md` does not say. The in-work row is a `<div>`, not an `<li>`. I learned this by rendering a probe page and reading only its markup, not `src/render.ts`, after the first run failed with "no `<li>` … holds step-b". Assumption: the in-work row is the smallest `<div>` holding the task's name and its stage. Depends on it: `A step in work > shows no number in step-b's row in the tasks-in-work section`.
 - **How a step row is marked up.** Assumption: a step's row, including a step with no task, is an `<li>` inside the workstream's `<details>`. This matches `rowOf`'s convention, and the first run found rows for every step, including the one with no task. Depends on it: every test that calls `streamRowText`.
+
+## Disposition
+
+Every entry above is **kept** local. Each is used by this file alone, and moving page readers into `tests/support/` is the work `docs/backlog/share-the-test-arrangement.md` already holds, with the other test plans' proposed homes; folding part of it in here would split that design. That entry's list of test plans gains this one at this change's archive.
