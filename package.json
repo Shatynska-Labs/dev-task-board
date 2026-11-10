@@ -1,6 +1,6 @@
 {
 	"name": "dev-task-board",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"description": "A local board of development tasks, read from your Git repositories.",
 	"license": "MIT",
 	"type": "module",
