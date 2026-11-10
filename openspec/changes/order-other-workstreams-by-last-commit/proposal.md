@@ -10,7 +10,7 @@ The "Other workstreams" section lists workstreams in the order the document give
 
 - On a project's page, the workstreams under "Other workstreams" are ordered by the greatest `last_commit` (Unix seconds) among the workstream's tasks, newest first. A workstream's tasks are the tasks its steps name and the tasks shown in it as unplaced.
 - A workstream none of whose tasks has a `last_commit` (absent or `null`) comes after every workstream that has one. Workstreams with equal latest commits, including those with none, are ordered by name in code-unit order, as the document orders names.
-- "Active workstreams" keep the document's order; the operator asked about "Other workstreams" only.
+- "Active workstreams" are ordered the same way, within their own section. This was added after `0.10.0` shipped, as a fix the operator asked for on 2026-11-10, raising the version to `0.11.0`.
 - The version rises from `0.9.0` to `0.10.0`, since the pages change visibly.
 
 ## Capabilities

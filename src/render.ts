@@ -425,9 +425,7 @@ function renderDocument(document: BoardDocument): string {
 	const loose = tasks
 		.filter((task) => !task.workstreams?.some((name) => known.has(name)))
 		.sort(looseOrder);
-	const active = streams.filter((stream) => stream.active);
-	const other = streams
-		.filter((stream) => !stream.active)
+	const ordered = streams
 		.map((stream) => ({ stream, at: latestCommit(stream, tasks) }))
 		.sort(
 			(a, b) =>
@@ -439,6 +437,8 @@ function renderDocument(document: BoardDocument): string {
 						: 0),
 		)
 		.map(({ stream }) => stream);
+	const active = ordered.filter((stream) => stream.active);
+	const other = ordered.filter((stream) => !stream.active);
 	const groups = (list: Stream[]) =>
 		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
 	const parts: string[] = [];

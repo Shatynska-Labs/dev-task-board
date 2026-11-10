@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: Other workstreams are ordered by their latest commit
+### Requirement: Workstreams are ordered by their latest commit
 
-On a project's page, the workstreams in the other-workstreams section SHALL be ordered by the greatest `last_commit`, a time in Unix seconds, among their tasks, newest first; a workstream's tasks are those its `steps` name and those whose `workstreams` name it but no step holds. A `last_commit` that is absent or `null` counts as none, and a workstream with none SHALL follow every workstream with one. Ties, including workstreams with none, SHALL be ordered by name in code-unit order, as the document orders names. Active workstreams SHALL keep the document's order.
+On a project's page, the workstreams in the active-workstreams section, and those in the other-workstreams section, SHALL each be ordered by the greatest `last_commit`, a time in Unix seconds, among their tasks, newest first; a workstream's tasks are those its `steps` name and those whose `workstreams` name it but no step holds. A `last_commit` that is absent or `null` counts as none, and a workstream with none SHALL follow every workstream with one. Ties, including workstreams with none, SHALL be ordered by name in code-unit order, as the document orders names.
 
 #### Scenario: Newest first
 
@@ -40,8 +40,8 @@ On a project's page, the workstreams in the other-workstreams section SHALL be o
 - **WHEN** their project's page is rendered
 - **THEN** `alpha` appears before `beta`
 
-#### Scenario: Active workstreams keep the document's order
+#### Scenario: Active workstreams are ordered too
 
 - **GIVEN** active workstreams `alpha`, whose step's task has `last_commit` 100, and `beta`, whose step's task has `last_commit` 200, in that order in the document
 - **WHEN** their project's page is rendered
-- **THEN** `alpha` appears before `beta`
+- **THEN** `beta` appears before `alpha` among the active workstreams
