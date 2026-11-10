@@ -400,6 +400,20 @@ function looseOrder(a: Task, b: Task): number {
 	);
 }
 
+// The newest commit among a workstream's steps and unplaced tasks, 0 for none.
+function latestCommit(stream: Stream, tasks: Task[]): number {
+	const steps = new Set(stream.steps.map((step) => step.name));
+	return Math.max(
+		0,
+		...tasks
+			.filter(
+				(task) =>
+					steps.has(task.name) || task.workstreams?.includes(stream.name),
+			)
+			.map((task) => task.last_commit ?? 0),
+	);
+}
+
 function renderDocument(document: BoardDocument): string {
 	const tasks = document.tasks ?? [];
 	const streams = document.workstreams ?? [];
@@ -412,7 +426,19 @@ function renderDocument(document: BoardDocument): string {
 		.filter((task) => !task.workstreams?.some((name) => known.has(name)))
 		.sort(looseOrder);
 	const active = streams.filter((stream) => stream.active);
-	const other = streams.filter((stream) => !stream.active);
+	const other = streams
+		.filter((stream) => !stream.active)
+		.map((stream) => ({ stream, at: latestCommit(stream, tasks) }))
+		.sort(
+			(a, b) =>
+				b.at - a.at ||
+				(a.stream.name < b.stream.name
+					? -1
+					: a.stream.name > b.stream.name
+						? 1
+						: 0),
+		)
+		.map(({ stream }) => stream);
 	const groups = (list: Stream[]) =>
 		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
 	const parts: string[] = [];
