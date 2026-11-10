@@ -148,7 +148,7 @@ describe("Other workstreams are ordered by their latest commit", () => {
 		expect(otherOrder(document, "alpha", "beta")).toEqual(["alpha", "beta"]);
 	});
 
-	it("Active workstreams keep the document's order: alpha, at 100, before beta, at 200", () => {
+	it("Active workstreams are ordered the same way: beta, at 200, before alpha, at 100", () => {
 		const document = fullDocument({
 			workstreams: [workstream("alpha", ["s-1"]), workstream("beta", ["s-2"])],
 			tasks: [
@@ -159,6 +159,6 @@ describe("Other workstreams are ordered by their latest commit", () => {
 
 		expect(
 			orderIn(sectionText(page(document), ACTIVE, OTHER), "alpha", "beta"),
-		).toEqual(["alpha", "beta"]);
+		).toEqual(["beta", "alpha"]);
 	});
 });

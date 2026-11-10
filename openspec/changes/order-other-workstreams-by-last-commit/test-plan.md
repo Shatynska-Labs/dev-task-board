@@ -22,7 +22,7 @@ Delta specs hold 7 scenarios, all under one `ADDED` requirement; 7 accounted for
 | 4 | No commit comes last | `No commit comes last: beta, at 100, before alpha, at null` | fails, wrong value (state 1): renders `alpha, beta` |
 | 5 | Equal commits by name | `Equal commits by name: alpha before beta, both at 100, beta first in the document` | fails, wrong value (state 1): renders `beta, alpha` |
 | 6 | No commits by name | `No commits by name: alpha before beta, neither with a commit, beta first in the document` | fails, wrong value (state 1): renders `beta, alpha` |
-| 7 | Active workstreams keep the document's order | `Active workstreams keep the document's order: alpha, at 100, before beta, at 200` | passes |
+| 7 | Active workstreams are ordered too | `Active workstreams are ordered the same way: beta, at 200, before alpha, at 100` | passes |
 
 One further test covers requirement text no scenario exercises: `an absent last_commit also counts as none and comes last` — fails, wrong value (state 1): renders `alpha, beta`.
 
