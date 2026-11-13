@@ -87,3 +87,7 @@ All declared in `tests/release-workflow.test.ts`, used by every test in that fil
 Full suite, before writing any test, at `679dc00` with `npm ci` provisioned: `npm test` → 29 files passed, 538 tests passed, 1 skipped, 0 failing. (`npm test` excludes `tests/package.test.ts` by its own definition.)
 
 After adding `tests/release-workflow.test.ts`: 30 files, 565 passed, 1 skipped, 1 failing — the single failure is the real-workflow check for "A raised version", red for the reasons recorded above. `biome ci` passes on the new file.
+
+### Dispositions
+
+Recorded at `build:applying`. Every entry is **kept** local. `tests/release-workflow.test.ts` is the only test that reads a workflow, so a shared YAML reader or workflow-step model would have one user; it is promoted to `tests/support/` when a second test needs it, or replaced by a YAML devDependency if the project decides on one.
