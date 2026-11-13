@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 // Workstreams the operator has starred, by project path. A view preference
@@ -82,8 +82,13 @@ async function writeWhole(path: string, text: string): Promise<void> {
 	await mkdir(dirname(path), { recursive: true });
 	written += 1;
 	const temporary = `${path}.${process.pid}.${written}.tmp`;
-	await writeFile(temporary, text);
-	await rename(temporary, path);
+	try {
+		await writeFile(temporary, text);
+		await rename(temporary, path);
+	} catch (error) {
+		await rm(temporary, { force: true });
+		throw error;
+	}
 }
 
 export async function loadStars(path: string): Promise<Stars> {
