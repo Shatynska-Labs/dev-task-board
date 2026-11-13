@@ -140,9 +140,12 @@ function projectAt(url: string, workspaces: Workspace[]) {
 	return workspace && project ? { workspace, project } : undefined;
 }
 
-// The body up to the limit, or undefined past it, read to its end either way.
-function bodyOf(request: IncomingMessage): Promise<string | undefined> {
-	return new Promise((resolve, reject) => {
+// The body up to the limit, or "long" past it, read to its end either way;
+// "aborted" where the client went away before it ended.
+function bodyOf(
+	request: IncomingMessage,
+): Promise<string | "long" | "aborted"> {
+	return new Promise((resolve) => {
 		const chunks: Buffer[] = [];
 		let length = 0;
 		request.on("data", (chunk: Buffer) => {
@@ -153,12 +156,10 @@ function bodyOf(request: IncomingMessage): Promise<string | undefined> {
 		});
 		request.on("end", () => {
 			resolve(
-				length > BODY_LIMIT
-					? undefined
-					: Buffer.concat(chunks).toString("utf8"),
+				length > BODY_LIMIT ? "long" : Buffer.concat(chunks).toString("utf8"),
 			);
 		});
-		request.on("error", reject);
+		request.on("error", () => resolve("aborted"));
 	});
 }
 
@@ -186,7 +187,11 @@ async function setStar(
 		return;
 	}
 	const body = await bodyOf(request);
-	if (body === undefined) {
+	if (body === "aborted") {
+		response.destroy();
+		return;
+	}
+	if (body === "long") {
 		answer(response, 413, renderNotFound());
 		return;
 	}
