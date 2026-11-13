@@ -19,6 +19,8 @@ export function isolatedEnvironment(root: string): NodeJS.ProcessEnv {
 		...Object.fromEntries(inherited),
 		HOME: home,
 		XDG_CONFIG_HOME: join(home, ".config"),
+		// So no board a test starts reads the stars of the machine running it.
+		XDG_STATE_HOME: join(home, ".local", "state"),
 		PATH: `${stubs}${delimiter}${process.env.PATH ?? ""}`,
 	};
 }

@@ -10,6 +10,7 @@ import {
 	settingsPath,
 	type Workspace,
 } from "./settings.js";
+import { loadStars, type Stars, StarsError, starsPath } from "./stars.js";
 
 const READ_LIMIT_MS = 60_000;
 const STOP_GRACE_MS = 5_000;
@@ -68,6 +69,17 @@ function readSettings(): Workspace[] {
 	}
 }
 
+async function readStars(): Promise<Stars> {
+	try {
+		return await loadStars(starsPath(process.env, homedir()));
+	} catch (error) {
+		if (error instanceof StarsError) {
+			throw new StartRefused(error.message);
+		}
+		throw error;
+	}
+}
+
 function refusalOfPort(port: number, error: NodeJS.ErrnoException): string {
 	return error.code === "EADDRINUSE"
 		? `port ${port} is in use`
@@ -78,6 +90,7 @@ export async function startBoard(port: number): Promise<void> {
 	try {
 		checkRequiredCommands();
 		const workspaces = readSettings();
+		const stars = await readStars();
 		const reads = createReads(workspaces, {
 			toolPath: fileURLToPath(new URL("../vendor/task-board", import.meta.url)),
 			limitMs: READ_LIMIT_MS,
@@ -86,7 +99,11 @@ export async function startBoard(port: number): Promise<void> {
 		const closing = new AbortController();
 		let bound: number;
 		try {
-			bound = await startServer({ workspaces, reads }, port, closing.signal);
+			bound = await startServer(
+				{ workspaces, reads, stars },
+				port,
+				closing.signal,
+			);
 		} catch (error) {
 			throw new StartRefused(
 				refusalOfPort(port, error as NodeJS.ErrnoException),

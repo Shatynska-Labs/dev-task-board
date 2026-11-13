@@ -51,7 +51,10 @@ h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: v
 details.group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
 details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: center }
 summary::-webkit-details-marker { display: none }
-summary:focus-visible, a:focus-visible { outline: 2px solid var(--work); outline-offset: 2px }
+.star { font: inherit; font-size: 15px; line-height: 1; background: none; border: 0; padding: 0 6px 0 0; cursor: pointer; color: var(--muted) }
+.star.on { color: var(--warn) }
+.star:hover { color: var(--work) }
+summary:focus-visible, a:focus-visible, .star:focus-visible { outline: 2px solid var(--work); outline-offset: 2px }
 .chev { color: var(--muted); font-size: 11px }
 details[open] > summary .chev { transform: rotate(90deg) }
 .sub { color: var(--muted); font-size: 13px; margin-top: 2px }
