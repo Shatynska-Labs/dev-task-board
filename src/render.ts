@@ -310,7 +310,30 @@ function openCounts(steps: Task[]): string {
 		: "";
 }
 
-function renderStream(stream: Stream, tasks: Task[], now: number): string {
+// What a project's document is rendered with besides itself.
+type Shown = {
+	// The workstreams starred for this project.
+	starred: Set<string>;
+	// Whether workstreams carry their ids: only the part left shown does, so an
+	// address ending #<workstream> reaches it.
+	ids: boolean;
+};
+
+// A button submitting the page's one stars form, which a summary may hold
+// where a form may not.
+function starButton(name: string, starred: boolean): string {
+	const [field, mark, label] = starred
+		? ["unstar", "★", "Unstar"]
+		: ["star", "☆", "Star"];
+	return `<button class="star${starred ? " on" : ""}" form="stars" name="${field}" value="${escapeHtml(name)}" aria-label="${label} ${escapeHtml(name)}" aria-pressed="${starred}">${mark}</button>`;
+}
+
+function renderStream(
+	stream: Stream,
+	tasks: Task[],
+	now: number,
+	shown: Shown,
+): string {
 	const stepNames = new Set(stream.steps.map((step) => step.name));
 	const rows = stream.steps.map((step, index) => {
 		const task = tasks.find((entry) => entry.name === step.name);
@@ -338,7 +361,9 @@ function renderStream(stream: Stream, tasks: Task[], now: number): string {
 	const summary = stream.summary
 		? `<div class="sub">${inline(stream.summary)}</div>`
 		: "";
-	return `<details class="group" id="${escapeHtml(stream.name)}"><summary>${chevron()}<div><div class="name">${escapeHtml(stream.name)}</div>${summary}${openCounts(stepTasks)}</div>${progress(stepTasks, unplaced)}</summary>
+	const id = shown.ids ? ` id="${escapeHtml(stream.name)}"` : "";
+	const star = starButton(stream.name, shown.starred.has(stream.name));
+	return `<details class="group"${id}><summary>${chevron()}<div><div class="name">${star}${escapeHtml(stream.name)}</div>${summary}${openCounts(stepTasks)}</div>${progress(stepTasks, unplaced)}</summary>
 <div class="body">
 ${about}${warnings(stream.warnings)}<ol class="steps">
 ${ROW_HEAD}${[...rows, ...unplaced.map((task) => taskRow(task, now, { unplaced: true }))].join("")}</ol>
@@ -414,7 +439,7 @@ function latestCommit(stream: Stream, tasks: Task[]): number {
 	);
 }
 
-function renderDocument(document: BoardDocument): string {
+function renderDocument(document: BoardDocument, shown: Shown): string {
 	const tasks = document.tasks ?? [];
 	const streams = document.workstreams ?? [];
 	const now = timeOf(document.written_at);
@@ -426,9 +451,14 @@ function renderDocument(document: BoardDocument): string {
 		.filter((task) => !task.workstreams?.some((name) => known.has(name)))
 		.sort(looseOrder);
 	const ordered = streams
-		.map((stream) => ({ stream, at: latestCommit(stream, tasks) }))
+		.map((stream) => ({
+			stream,
+			at: latestCommit(stream, tasks),
+			first: shown.starred.has(stream.name) ? 0 : 1,
+		}))
 		.sort(
 			(a, b) =>
+				a.first - b.first ||
 				b.at - a.at ||
 				(a.stream.name < b.stream.name
 					? -1
@@ -440,7 +470,7 @@ function renderDocument(document: BoardDocument): string {
 	const active = ordered.filter((stream) => stream.active);
 	const other = ordered.filter((stream) => !stream.active);
 	const groups = (list: Stream[]) =>
-		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now)).join("")}</div>`;
+		`<div class="groups">${list.map((stream) => renderStream(stream, tasks, now, shown)).join("")}</div>`;
 	const parts: string[] = [];
 	const partial = !isFull(document as ProjectDocument);
 	parts.push(
@@ -594,7 +624,10 @@ function phase(body: string): string {
 	return `<section class="phase">\n${body}\n</section>\n`;
 }
 
-function projectState(state: ProjectState | undefined): string {
+function projectState(
+	state: ProjectState | undefined,
+	starred: Set<string>,
+): string {
 	if (state === undefined || state.state === "reading") {
 		return '<p class="meta">This project is being read.</p>';
 	}
@@ -607,7 +640,7 @@ function projectState(state: ProjectState | undefined): string {
 		lines.length > 0
 			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
 			: "";
-	return `<p class="stamp">Read ${readTime(state.readAt)}</p>\n${notice}${renderDocument(document)}`;
+	return `<p class="stamp">Read ${readTime(state.readAt)}</p>\n${notice}${renderDocument(document, { starred, ids: true })}`;
 }
 
 // The parts of a project's page, for a server that sends them as reads end.
@@ -616,20 +649,31 @@ export function projectPageStart(
 	projectName: string,
 	workspaceNames: string[] = [],
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${phase('<p class="meta">This project is being read.</p>')}`;
+	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase('<p class="meta">This project is being read.</p>')}`;
 }
 
-export function quickPart(document: ProjectDocument): string {
+// The page's one form, which every part's star buttons submit.
+function starsForm(workspaceName: string, projectName: string): string {
+	return `<form id="stars" method="post" action="${href(workspaceName, projectName)}"></form>\n`;
+}
+
+export function quickPart(
+	document: ProjectDocument,
+	starred: Set<string> = new Set(),
+): string {
 	const others = whatMissed(document, { forge: false })
 		.map((line) => `<span>${escapeHtml(line)}</span>`)
 		.join("");
 	return phase(
-		`<div class="notice"><span>Read from git alone: GitHub is still being read, so statuses may be wrong.</span>${others}</div>\n${renderDocument(document as BoardDocument)}`,
+		`<div class="notice"><span>Read from git alone: GitHub is still being read, so statuses may be wrong.</span>${others}</div>\n${renderDocument(document as BoardDocument, { starred, ids: false })}`,
 	);
 }
 
-export function projectPageEnd(state: ProjectState | undefined): string {
-	return `${phase(projectState(state))}${LAYOUT_END}`;
+export function projectPageEnd(
+	state: ProjectState | undefined,
+	starred: Set<string> = new Set(),
+): string {
+	return `${phase(projectState(state, starred))}${LAYOUT_END}`;
 }
 
 export function renderProject(
@@ -637,8 +681,21 @@ export function renderProject(
 	projectName: string,
 	state: ProjectState | undefined,
 	workspaceNames: string[] = [],
+	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${projectPageEnd(state)}`;
+	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${projectPageEnd(state, starred)}`;
+}
+
+export function renderStarFailed(
+	workspaceName: string,
+	projectName: string,
+	reason: string,
+): string {
+	return page(
+		"Star not saved",
+		"<h1>The star could not be saved</h1>",
+		`<div class="notice">${escapeHtml(reason)}</div>\n<p class="meta"><a href="${href(workspaceName, projectName)}">Back to ${escapeHtml(projectName)}</a></p>`,
+	);
 }
 
 export function renderNotFound(): string {
