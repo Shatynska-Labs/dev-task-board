@@ -159,7 +159,8 @@ async function offered(
 ): Promise<number | undefined> {
 	const last = Math.min(port + OFFER_RANGE, HIGHEST_PORT);
 	for (let candidate = port + 1; candidate <= last; candidate++) {
-		const bound = await tryBind(candidate, bind);
+		// A candidate that cannot be bound for any reason is skipped.
+		const bound = await bind(candidate).catch(() => undefined);
 		if (bound !== undefined) {
 			return bound;
 		}
@@ -172,7 +173,14 @@ async function replace(
 	board: Holder,
 	dependencies: BindDependencies,
 ): Promise<number> {
-	dependencies.signal(board.pid, "SIGTERM");
+	try {
+		dependencies.signal(board.pid, "SIGTERM");
+	} catch (error) {
+		// Gone already: its port is about to be free.
+		if ((error as NodeJS.ErrnoException)?.code !== "ESRCH") {
+			throw error;
+		}
+	}
 	const deadline = Date.now() + WAIT_MS;
 	for (;;) {
 		const bound = await tryBind(port, dependencies.bind);
