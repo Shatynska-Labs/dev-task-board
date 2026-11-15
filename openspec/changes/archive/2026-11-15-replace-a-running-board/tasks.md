@@ -13,3 +13,7 @@
 
 - [x] 3.1 In `README.md`, describe in Server and Running it that a running board is replaced and another program's port is not taken, and add `port` to Settings; verify by reading it against `design.md`.
 - [x] 3.2 Raise the version from `0.12.0` to `0.13.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build` and `npm run check:package`.
+
+## 4. Confirm
+
+- [x] 4.1 Confirmed by the operator on 2026-11-15 ("чудово, це спрацювало"), after PR #35 merged and `0.13.0` was approved from staging: `npx dev-task-board@0.13.0`, run while a `0.12.0` board held port 8766, replaced it.
