@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 
-const DEFAULT_PORT = 8766;
 const LOWEST_PORT = 1024;
 const HIGHEST_PORT = 65535;
 
-function requestedPort(args: string[]): number | undefined {
+// null where no --port was given, so the settings or the default decide.
+function requestedPort(args: string[]): number | null | undefined {
 	if (args.length === 0) {
-		return DEFAULT_PORT;
+		return null;
 	}
 	const [flag, value] = args;
 	if (args.length !== 2 || flag !== "--port" || !/^\d+$/.test(value ?? "")) {
@@ -33,6 +33,6 @@ if (args.length === 1 && args[0] === "--version") {
 	} else {
 		// Loaded here so that --version needs no dependency.
 		const { startBoard } = await import("./board.js");
-		await startBoard(port);
+		await startBoard(port ?? undefined);
 	}
 }

@@ -22,5 +22,9 @@ jobs:
         run: node tools/release-decision.mjs >> "$GITHUB_OUTPUT"
       - if: steps.decision.outputs.publish == 'true'
         run: npm ci
+      # Built before npm reads package.json, so the bin it names exists.
       - if: steps.decision.outputs.publish == 'true'
-        run: npm publish --provenance
+        run: npm run build
+      # Staged, never published: the operator approves it on npmjs.com.
+      - if: steps.decision.outputs.publish == 'true'
+        run: npm stage publish --provenance

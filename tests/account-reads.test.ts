@@ -181,7 +181,8 @@ function settings(
 				}`,
 		)
 		.join("");
-	return parseSettings(text, { home: root, isDirectory: () => true });
+	return parseSettings(text, { home: root, isDirectory: () => true })
+		.workspaces;
 }
 
 function board(

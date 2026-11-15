@@ -73,7 +73,7 @@ describe("A workspace may name a GitHub account", () => {
 			const [read] = parseSettings(
 				workspace("desk", 'github_account = "someone"'),
 				everyPathADirectory,
-			);
+			).workspaces;
 
 			expect(Object.values(read as object)).toContain("someone");
 		});
@@ -82,7 +82,7 @@ describe("A workspace may name a GitHub account", () => {
 			const [read] = parseSettings(
 				workspace("desk", 'github_account = "  Some.One  "'),
 				everyPathADirectory,
-			);
+			).workspaces;
 
 			expect(Object.values(read as object)).toContain("  Some.One  ");
 		});
@@ -92,7 +92,7 @@ describe("A workspace may name a GitHub account", () => {
 				workspace("a", 'github_account = "first"') +
 					workspace("b", 'github_account = "second"'),
 				everyPathADirectory,
-			);
+			).workspaces;
 
 			expect(Object.values(first as object)).toContain("first");
 			expect(Object.values(second as object)).toContain("second");
@@ -112,7 +112,7 @@ describe("A workspace may name a GitHub account", () => {
 			const [read] = parseSettings(
 				workspace("desk", 'github_account = "someone"'),
 				everyPathADirectory,
-			);
+			).workspaces;
 
 			expect(Object.values(read as object)).toContain("someone");
 			expect(existsSync(asked)).toBe(false);
@@ -124,7 +124,7 @@ describe("A workspace may name a GitHub account", () => {
 			const [read] = parseSettings(
 				'[workspaces.desk]\nprojects = ["/srv/root/one"]\n',
 				everyPathADirectory,
-			);
+			).workspaces;
 
 			expect(read).toEqual({
 				name: "desk",
