@@ -7,6 +7,7 @@ export type Workspace = {
 	projects: Project[];
 	githubAccount?: string;
 };
+export type Settings = { workspaces: Workspace[]; port?: number };
 export type SettingsOptions = {
 	home: string;
 	isDirectory: (path: string) => boolean;
@@ -113,15 +114,35 @@ function parseWorkspace(
 	};
 }
 
+export const LOWEST_PORT = 1024;
+export const HIGHEST_PORT = 65535;
+
+export function isUsablePort(value: unknown): value is number {
+	return (
+		typeof value === "number" &&
+		Number.isInteger(value) &&
+		value >= LOWEST_PORT &&
+		value <= HIGHEST_PORT
+	);
+}
+
 export function parseSettings(
 	text: string,
 	options: SettingsOptions,
-): Workspace[] {
-	const { workspaces } = parseToml(text);
+): Settings {
+	const { workspaces, port } = parseToml(text);
+	if (port !== undefined && !isUsablePort(port)) {
+		throw new SettingsError(
+			`port is not a whole number from ${LOWEST_PORT} to ${HIGHEST_PORT}`,
+		);
+	}
 	if (!isTable(workspaces) || Object.keys(workspaces).length === 0) {
 		throw new SettingsError("it names no workspace");
 	}
-	return Object.entries(workspaces).map(([name, table]) =>
-		parseWorkspace(name, table, options),
-	);
+	return {
+		workspaces: Object.entries(workspaces).map(([name, table]) =>
+			parseWorkspace(name, table, options),
+		),
+		...(port === undefined ? {} : { port }),
+	};
 }

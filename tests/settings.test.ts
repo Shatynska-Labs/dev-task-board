@@ -51,7 +51,7 @@ describe("Settings name workspaces and their projects", () => {
 
 	describe("A valid file", () => {
 		it("holds projects by base name, with ~/ expanded", () => {
-			const settings = parseSettings(
+			const { workspaces: settings } = parseSettings(
 				workspace("work", ["~/a/one", `${root}/b/two`]),
 				directories(`${home}/a/one`, `${root}/b/two`),
 			);
@@ -68,7 +68,7 @@ describe("Settings name workspaces and their projects", () => {
 		});
 
 		it("takes the base name after normalising the path", () => {
-			const settings = parseSettings(
+			const { workspaces: settings } = parseSettings(
 				workspace("work", [`${root}/a/one/`, `${root}/b/x/../two`]),
 				everyPathADirectory,
 			);
@@ -85,7 +85,7 @@ describe("Settings name workspaces and their projects", () => {
 		});
 
 		it("keeps several workspaces, which may share a base name", () => {
-			const settings = parseSettings(
+			const { workspaces: settings } = parseSettings(
 				workspace("a", [`${root}/a/one`]) + workspace("b", [`${root}/b/one`]),
 				everyPathADirectory,
 			);
