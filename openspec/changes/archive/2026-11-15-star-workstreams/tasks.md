@@ -14,3 +14,7 @@
 
 - [x] 3.1 In `README.md`, state beside the Non-Goal "Editing tasks from the page" that a star is a view preference kept by the board, add the stars file to Technology and Architecture, saying to edit it with the board stopped, and the write route to Server, and describe starring under Status; verify by reading it against `design.md`.
 - [x] 3.2 Raise the version from `0.11.0` to `0.12.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build` and `npm run check:package`.
+
+## 4. Confirm
+
+- [x] 4.1 Confirmed by the operator on 2026-11-15 ("так"), on `0.12.0` from the registry, published through staging by `publish-through-staging`: a workstream starred from the page stayed starred after the board restarted. The operator found the page going blank while it reloads after a star too abrupt; the successor `show-the-held-document-first` takes that.
