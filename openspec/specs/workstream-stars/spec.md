@@ -1,7 +1,8 @@
 # workstream-stars Specification
 
 ## Purpose
-TBD - created by archiving change star-workstreams. Update Purpose after archive.
+
+Where the workstreams the operator stars are kept, how a project's page sets and clears a star, and how that one request that changes anything is guarded.
 
 ## Requirements
 
