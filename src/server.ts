@@ -57,7 +57,9 @@ function projectPage(
 ): Streamed {
 	return async (response) => {
 		response.writeHead(200, HEADERS);
-		response.write(projectPageStart(workspace, project, names));
+		// Taken before the reads start, so it is what was held when asked.
+		const held = reads.get(workspace, project);
+		response.write(projectPageStart(workspace, project, names, held, starred));
 		let fullEnded = false;
 		const full = reads.refresh(workspace, project).then(() => {
 			fullEnded = true;

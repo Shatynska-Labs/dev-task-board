@@ -634,13 +634,38 @@ function projectState(
 	if (state.state === "failed") {
 		return `<div class="notice">The read failed: ${escapeHtml(state.reason)}</div>`;
 	}
-	const document = state.document as BoardDocument;
+	return heldDocument(state, starred, {
+		stamp: `Read ${readTime(state.readAt)}`,
+		ids: true,
+	});
+}
+
+function heldDocument(
+	state: Extract<ProjectState, { state: "read" }>,
+	starred: Set<string>,
+	{ stamp, ids }: { stamp: string; ids: boolean },
+): string {
 	const lines = noticeLines(state.document, state.readAt, state.latest);
 	const notice =
 		lines.length > 0
 			? `<div class="notice">${lines.map((line) => `<span>${line}</span>`).join("")}</div>\n`
 			: "";
-	return `<p class="stamp">Read ${readTime(state.readAt)}</p>\n${notice}${renderDocument(document, { starred, ids: true })}`;
+	return `<p class="stamp">${stamp}</p>\n${notice}${renderDocument(state.document as BoardDocument, { starred, ids })}`;
+}
+
+// The first part: what the project held when its page was asked for, or that
+// it is being read where it held nothing. Never the last part, so no ids.
+function heldPart(
+	state: ProjectState | undefined,
+	starred: Set<string>,
+): string {
+	if (state?.state !== "read") {
+		return '<p class="meta">This project is being read.</p>';
+	}
+	return heldDocument(state, starred, {
+		stamp: `Shown as read ${readTime(state.readAt)}; being read again.`,
+		ids: false,
+	});
 }
 
 // The parts of a project's page, for a server that sends them as reads end.
@@ -648,8 +673,10 @@ export function projectPageStart(
 	workspaceName: string,
 	projectName: string,
 	workspaceNames: string[] = [],
+	held?: ProjectState,
+	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase('<p class="meta">This project is being read.</p>')}`;
+	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase(heldPart(held, starred))}`;
 }
 
 // The page's one form, which every part's star buttons submit.

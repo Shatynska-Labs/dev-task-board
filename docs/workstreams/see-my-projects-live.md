@@ -24,4 +24,4 @@ The board's scope, architecture and failure rules are in `README.md`. Status, st
 
 ## Decisions
 
-**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`; revised with `open-pages-at-once`, 2026-11-03. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script. A project's page is sent in parts as its reads end, so the wait shows what `git` gives first, and an overview reads nothing, since it is used to move between projects.
+**1. A refresh, not a page that updates itself.** The operator, 2026-11-02, with `read-on-refresh`, which replaces the planned `keep-the-page-current`; revised with `open-pages-at-once`, 2026-11-03. Seeing fresh data on refreshing is enough, so no timer runs and pages carry no script. A project's page is sent in parts as its reads end, so the wait shows what was last read, then what `git` gives (revised with `show-the-held-document-first`, 2026-11-15), and an overview reads nothing, since it is used to move between projects.
