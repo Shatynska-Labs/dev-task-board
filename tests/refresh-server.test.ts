@@ -165,8 +165,10 @@ describe("A page shows what was read for it", () => {
 			finish();
 			const { status, body } = await answer;
 			expect(status).toBe(200);
-			expect(body).toContain("fresh-task");
-			expect(body).not.toContain("only-task");
+			// The first part shows what was held; what the read left is the last.
+			const last = body.split('<section class="phase">').at(-1) ?? "";
+			expect(last).toContain("fresh-task");
+			expect(last).not.toContain("only-task");
 		});
 
 		it("reads again on each request", async () => {

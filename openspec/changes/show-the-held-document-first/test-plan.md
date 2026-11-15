@@ -99,3 +99,14 @@ The shared arrangement is `tests/support/`; the new file takes `fullDocument`, `
 | `delay`, `waitUntil`, `firstPartOf` | waiting for a condition; reading a never-ending page's first part | every test | none | `delay`/`waitUntil` in `tests/open-pages-at-once.test.ts` | `tests/support/wait.ts` (`firstPartOf` beside `open`) |
 | `machine`, `boardHolding`, `startsOf` | a stub gh and stub carried tool with hold/release/fail per kind of read; a board that has read once | Held, then the reads; Quick, then full; Full first; A quick read that fails; Only the latest is seen | none | adapted from `machine` in `tests/open-pages-at-once.test.ts` and `tests/stars-parts.test.ts` | `tests/support/fixture.ts` or a new `tests/support/tool.ts` |
 | `alphaDocument`, `utc` | a document with workstream `alpha` and one step; the page's time format | as above | `fullDocument`/`workstream`/`step` are used, not replaced | `documentOf` in `tests/stars-parts.test.ts` | `tests/support/document.ts` |
+
+## Obsolete tests: dispositions
+
+Recorded at `build:applying`, 2026-11-15.
+
+- `tests/refresh-server.test.ts` "answers a project's page once its read is done, with what it left": **updated** for the MODIFIED requirement. Its whole-body `not.toContain("only-task")` asserted that the held task appears nowhere, which the first part now shows by design; it now asserts `fresh-task` present and `only-task` absent in the last part, which is what "what it left" means.
+- `tests/open-pages-at-once.test.ts` "The first part comes at once", "Quick, then full" and "Full first": **unchanged**; nothing is held in their setup, so their being-read first part still holds.
+
+## Missing shared arrangement: dispositions
+
+Every entry above is **kept** local: each repeats helpers other test files declare locally (`stubStars`, a stub `reads`, part helpers, a stub-tool `machine`), which the backlog entry `share-the-test-arrangement` consolidates at once; promoting this file's copies alone would add a second shared version beside those. The `shown` wrapper works around the shared `textOf`'s spacing for this file's assertions only.
