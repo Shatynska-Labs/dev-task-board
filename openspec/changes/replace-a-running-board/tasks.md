@@ -6,7 +6,7 @@
 
 ## 2. The holder
 
-- [ ] 2.1 Add `src/port.ts`: `holderOf(port)`, finding the listening process through `/proc` on Linux and `lsof` and `ps` on macOS, and deciding `isBoard` as design.md decision 1 states; `bindPort`, which on `EADDRINUSE` replaces a board, waiting up to 10 s, or else offers the nearest bindable port above within 100 where standard input and output are terminals, or refuses with the advice; verify with the derived tests for "A running board is replaced", "A board that does not let go refuses the start", "Another program's port is not taken" and "In a terminal, another port is offered".
+- [ ] 2.1 Add `src/port.ts`: `holderOf(port)`, finding the listening process through `/proc` on Linux and `lsof` and `ps` on macOS, and deciding `isBoard` as design.md decision 1 states; `bindPort`, which on `EADDRINUSE` replaces a board, waiting up to 10 s, or else offers the nearest bindable port above within 100 where standard input and output are terminals, or refuses with the advice; verify with the derived tests for "A running board is replaced", "A board that does not let go refuses the start", "Another program's port is not taken", "The offered port" and "In a terminal, another port is offered".
 - [ ] 2.2 In `src/board.ts`, bind through `bindPort`, printing the replacement before the address, and keep other bind failures as today's refusal; verify with the derived tests for "The server is local and refuses other hosts".
 
 ## 3. Record and release
