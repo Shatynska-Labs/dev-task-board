@@ -47,3 +47,7 @@ See `proposal.md` for why. Today the board holds nothing between runs but the se
 ## Migration Plan
 
 None: with no stars file the board starts with no stars. Rolling back to `0.11.0` ignores the file.
+
+## Waits on
+
+**`publish-through-staging`.** Pull request #33 merged on 2026-11-13, raising the version to `0.12.0`, but the release failed at `npm publish` with `E404` (run 43514917835): the trusted publisher on npmjs.com allows staged publishing only, and the operator decided the same day to keep it so and move the release workflow to `npm stage publish`. That change is opened on its own branch with a handoff. Until it merges and the operator approves `0.12.0` on npmjs.com, this change cannot be confirmed: confirming it means running `npx dev-task-board@0.12.0`.
