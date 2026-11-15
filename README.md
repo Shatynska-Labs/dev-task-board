@@ -57,7 +57,7 @@ A developer working with the `ai-toolkit` workflow's conventions: `docs/workstre
 
 ## Status
 
-An overview answers at once from what the board holds. Refreshing a project's page reads it: the page says at once that it is being read, shows what `git` gives within seconds, marked as such, and then the project's tasks as they stand once GitHub has been read. A read that fails or misses something leaves the last document in place where Architecture says so, and the page says what is kept and what was missed.
+An overview answers at once from what the board holds. Refreshing a project's page reads it: the page shows at once what was last read, saying it is being read again, or that it is being read where nothing has been, then shows what `git` gives within seconds, marked as such, and then the project's tasks as they stand once GitHub has been read. A read that fails or misses something leaves the last document in place where Architecture says so, and the page says what is kept and what was missed.
 
 Each workstream has a star, ☆, beside its name. Pressing it stars the workstream, ★, which then comes first in its section; pressing it again clears it. Stars are kept on this machine across refreshes, restarts and upgrades.
 
