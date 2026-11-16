@@ -27,8 +27,12 @@
 
 ## 5. After the merge
 
-- [ ] 5.1 The operator publishes once from a clean, provisioned `main`, on their own confirmation
-- [ ] 5.2 The operator sets the trusted publisher: repository `Shatynska-Labs/dev-task-board`, workflow `release.yml`
-- [ ] 5.3 Verify `npx dev-task-board@0.1.0 --version` prints `0.1.0`, and that the release workflow's run on `main` published nothing, and that GitHub reports no error for the Dependabot configuration
+- [x] 5.1 The operator publishes once from a clean, provisioned `main`, on their own confirmation — done as `0.11.0` on 2026-11-10, after a `0.0.0-stage` placeholder; `0.1.0` was never published
+- [x] 5.2 The operator sets the trusted publisher: repository `Shatynska-Labs/dev-task-board`, workflow `release.yml` — in effect: `0.12.0` to `0.16.0` were staged by `release.yml` and published on the operator's approval
+- [x] 5.3 Verify `npx dev-task-board@0.1.0 --version` prints `0.1.0`, and that the release workflow's run on `main` published nothing, and that GitHub reports no error for the Dependabot configuration — `0.1.0` does not exist, so it cannot be run; the published package runs as `0.16.0`; the release workflow's first runs on `main`, on 2026-11-01, succeeded with nothing on the registry before `0.11.0`; Dependabot has opened pull requests for npm, four of them merged
 
 **Specs already synced**: `show-a-workspace`'s archive synced this change's `package` and `release` deltas on 2026-11-01. Archive this change without syncing them again: `show-a-workspace` has since replaced part of `package`.
+
+## 6. Confirm
+
+- [x] 6.1 On 2026-11-16 the operator confirmed that they made the first publish, as `0.11.0` on 2026-11-10, and asked for this change to be recorded. Branch protection, from 4.2, requires both platforms' gate on `main`. Archived without syncing specs, as noted above.
