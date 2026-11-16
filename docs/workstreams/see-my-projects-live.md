@@ -13,7 +13,8 @@
 5. `switch-between-workspaces` — several named workspaces as tabs, and an optional `github_account` for each.
 6. `open-pages-at-once` — an overview drawn from what is held, and a project's page that shows what `git` gives first and the full read after, in one response.
 7. `show-the-held-document-first` — a project's page opens on what was last read, with its age, while it is read again.
-8. `write-the-settings` — the setup command.
+8. `star-without-reloading` — a star set in place on a project's page, and a reload that reopens what was open.
+9. `write-the-settings` — the setup command.
 
 - **Not in scope**: what `README.md`'s Non-Goals name, among them editing tasks from the page and reading uncommitted work.
 - **Open questions**: none
