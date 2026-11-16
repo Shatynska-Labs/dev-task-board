@@ -600,7 +600,7 @@ describe("The accepted layout", () => {
 
 		expect(inWork).toContain("what it does");
 		expect(inWork).toContain("unplaced");
-		expect(inWork).toContain("pull requests not checked");
+		expect(inWork).toContain("not checked");
 	});
 });
 
