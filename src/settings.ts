@@ -13,9 +13,14 @@ export type SettingsOptions = {
 	isDirectory: (path: string) => boolean;
 };
 
+// Where names relative to the projects folder are resolved from.
+type Resolving = SettingsOptions & { projectsDir: string };
+
 export class SettingsError extends Error {}
 
-const UNUSABLE_NAMES = new Set(["", ".", "..", "api"]);
+const UNUSABLE_NAMES = new Set(["", ".", "..", "api", "settings"]);
+
+export const DEFAULT_PROJECTS_DIR = "~/projects";
 
 function isTable(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,17 +45,48 @@ function parseToml(text: string): Record<string, unknown> {
 	}
 }
 
+function expandHome(written: string, home: string): string {
+	return written.startsWith("~/") ? join(home, written.slice(2)) : written;
+}
+
+// A name relative to the projects folder: no leading / or ~, and no empty,
+// . or .. segment, so it stays inside the folder.
+function isFolderName(written: string): boolean {
+	return (
+		!written.startsWith("/") &&
+		!written.startsWith("~") &&
+		written
+			.split("/")
+			.every((segment) => segment !== "" && segment !== "." && segment !== "..")
+	);
+}
+
+// Where a project as written lies, before any check that it is there.
+export function writtenPath(
+	written: string,
+	projectsDir: string,
+	home: string,
+): string {
+	return resolve(
+		isFolderName(written)
+			? join(projectsDir, written)
+			: written.startsWith("~/")
+				? join(home, written.slice(2))
+				: written,
+	);
+}
+
 function resolvePath(
 	written: string,
 	workspace: string,
-	options: SettingsOptions,
+	options: Resolving,
 ): string {
-	const expanded = written.startsWith("~/")
-		? join(options.home, written.slice(2))
-		: written;
+	const expanded = isFolderName(written)
+		? join(options.projectsDir, written)
+		: expandHome(written, options.home);
 	if (!isAbsolute(expanded)) {
 		throw new SettingsError(
-			`workspace ${workspace}: ${written} is not an absolute path or one beginning ~/`,
+			`workspace ${workspace}: ${written} is not an absolute path, one beginning ~/, or a name in the projects folder`,
 		);
 	}
 	const path = resolve(expanded);
@@ -70,7 +106,7 @@ function resolvePath(
 function parseWorkspace(
 	name: string,
 	table: unknown,
-	options: SettingsOptions,
+	options: Resolving,
 ): Workspace {
 	if (UNUSABLE_NAMES.has(name) || name.includes("/")) {
 		throw new SettingsError(`the name "${name}" cannot be a workspace's`);
@@ -89,11 +125,10 @@ function parseWorkspace(
 	}
 	if (
 		!Array.isArray(projects) ||
-		projects.length === 0 ||
 		!projects.every((project) => typeof project === "string")
 	) {
 		throw new SettingsError(
-			`workspace ${name}: projects must be a non-empty list of paths`,
+			`workspace ${name}: projects must be a list of paths or names`,
 		);
 	}
 	const paths = projects.map((path) => resolvePath(path, name, options));
@@ -126,22 +161,40 @@ export function isUsablePort(value: unknown): value is number {
 	);
 }
 
+// The projects folder as written, `~/projects` where absent.
+export function projectsDirOf(value: unknown, home: string): string {
+	if (value === undefined) {
+		return expandHome(DEFAULT_PROJECTS_DIR, home);
+	}
+	if (
+		typeof value !== "string" ||
+		!(value.startsWith("/") || value.startsWith("~/"))
+	) {
+		throw new SettingsError("projects_dir is not a path beginning / or ~/");
+	}
+	return resolve(expandHome(value, home));
+}
+
 export function parseSettings(
 	text: string,
 	options: SettingsOptions,
 ): Settings {
-	const { workspaces, port } = parseToml(text);
+	const { workspaces = {}, port, projects_dir: projectsDir } = parseToml(text);
 	if (port !== undefined && !isUsablePort(port)) {
 		throw new SettingsError(
 			`port is not a whole number from ${LOWEST_PORT} to ${HIGHEST_PORT}`,
 		);
 	}
-	if (!isTable(workspaces) || Object.keys(workspaces).length === 0) {
-		throw new SettingsError("it names no workspace");
+	const resolving = {
+		...options,
+		projectsDir: projectsDirOf(projectsDir, options.home),
+	};
+	if (!isTable(workspaces)) {
+		throw new SettingsError("workspaces is not a table");
 	}
 	return {
 		workspaces: Object.entries(workspaces).map(([name, table]) =>
-			parseWorkspace(name, table, options),
+			parseWorkspace(name, table, resolving),
 		),
 		...(port === undefined ? {} : { port }),
 	};

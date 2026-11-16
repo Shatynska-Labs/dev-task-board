@@ -56,6 +56,21 @@ h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: v
 details.group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px }
 details.group > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: center }
 summary::-webkit-details-marker { display: none }
+.tabs .settings-link { margin-left: auto }
+.meta.way { display: flex; gap: 16px; justify-content: space-between }
+.meta.way .settings-link:only-child { margin-left: auto }
+.settings-link { color: var(--muted) }
+.settings-workspace { display: grid; gap: 10px }
+.settings-workspace h2 { margin: 0 }
+.settings-workspace .found summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0 }
+.settings-workspace .found[open] summary { margin-bottom: 8px }
+.settings-workspace .row form.inline { margin: 0 }
+.settings-workspace .offered .name { color: var(--muted) }
+.settings-workspace .add { grid-template-columns: minmax(0, 1fr) auto }
+.settings-workspace input { font: inherit; font-family: var(--mono); font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); min-width: 0 }
+.settings-workspace button, form.inline > button { font: inherit; font-size: 13px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); cursor: pointer }
+.settings-workspace button:hover { border-color: var(--work); color: var(--work) }
+.settings-workspace button:focus-visible, .settings-workspace input:focus-visible { outline: 2px solid var(--work); outline-offset: 2px }
 .star { font: inherit; font-size: 15px; line-height: 1; background: none; border: 0; padding: 0 6px 0 0; cursor: pointer; color: var(--muted) }
 .star.on { color: var(--warn) }
 .star:hover { color: var(--work) }

@@ -5,13 +5,14 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { bindPort, holderOf, PortRefused } from "./port.js";
 import { createReads } from "./reads.js";
-import { startServer } from "./server.js";
+import { type BoardState, startServer } from "./server.js";
 import {
 	parseSettings,
 	type Settings,
 	SettingsError,
 	settingsPath,
 } from "./settings.js";
+import { settingsFile, settingsView } from "./settings-file.js";
 import { loadStars, type Stars, StarsError, starsPath } from "./stars.js";
 
 const DEFAULT_PORT = 8766;
@@ -51,12 +52,17 @@ function isDirectory(path: string): boolean {
 	}
 }
 
+// A missing file is no workspace yet, set up from the settings page; a file
+// that is there but cannot be read refuses the start, so nothing saves over it.
 function readSettings(file: string): Settings {
 	const home = homedir();
 	let text: string;
 	try {
 		text = readFileSync(file, "utf8");
-	} catch {
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			return { workspaces: [] };
+		}
 		throw new StartRefused(
 			`${file} could not be read. It holds:\n\n${EXPECTED_SHAPE}`,
 		);
@@ -122,12 +128,26 @@ export async function startBoard(requested?: number): Promise<void> {
 			limitMs: READ_LIMIT_MS,
 			graceMs: STOP_GRACE_MS,
 		});
+		const home = homedir();
+		const saving = settingsFile(file, { home, isDirectory });
+		const state: BoardState = {
+			workspaces,
+			reads,
+			stars,
+			settings: {
+				view: () => settingsView(file, home),
+				async save(action) {
+					const saved = await saving.save(action);
+					state.workspaces = saved.workspaces;
+					reads.replace(saved.workspaces);
+				},
+			},
+		};
 		const closing = new AbortController();
 		let bound: number;
 		try {
 			bound = await bindPort(port, {
-				bind: (each) =>
-					startServer({ workspaces, reads, stars }, each, closing.signal),
+				bind: (each) => startServer(state, each, closing.signal),
 				holderOf,
 				signal: (pid, signal) => process.kill(pid, signal),
 				...(process.stdin.isTTY && process.stdout.isTTY ? { ask } : {}),
@@ -154,7 +174,11 @@ export async function startBoard(requested?: number): Promise<void> {
 		};
 		process.on("SIGINT", stop);
 		process.on("SIGTERM", stop);
-		console.log(`http://127.0.0.1:${bound}`);
+		console.log(
+			workspaces.length === 0
+				? `http://127.0.0.1:${bound}/settings, to add projects`
+				: `http://127.0.0.1:${bound}`,
+		);
 		await reads.start();
 	} catch (error) {
 		if (!(error instanceof StartRefused)) {

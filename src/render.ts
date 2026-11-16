@@ -8,6 +8,7 @@ import {
 	whatMissed,
 } from "./reads.js";
 import type { Workspace } from "./settings.js";
+import type { SettingsView } from "./settings-file.js";
 import { STYLE } from "./style.js";
 
 type Task = {
@@ -578,6 +579,13 @@ function counts(state: ProjectState | undefined): string {
 }
 
 // Plain links, since each workspace has an address and pages carry no script.
+const SETTINGS_LINK = '<a class="settings-link" href="/settings">Settings</a>';
+
+// The settings link where there are no tabs to carry it.
+function settingsLine(way = ""): string {
+	return `<p class="meta way">${way}${SETTINGS_LINK}</p>`;
+}
+
 function tabs(names: string[], current: string): string {
 	if (names.length < 2) {
 		return "";
@@ -586,7 +594,7 @@ function tabs(names: string[], current: string): string {
 		(name) =>
 			`<a href="${href(name)}"${name === current ? ' aria-current="page"' : ""}>${escapeHtml(name)}</a>`,
 	);
-	return `<nav class="tabs" aria-label="Workspaces">${links.join("")}</nav>`;
+	return `<nav class="tabs" aria-label="Workspaces">${links.join("")}${SETTINGS_LINK}</nav>`;
 }
 
 function page(title: string, heading: string, body: string): string {
@@ -600,7 +608,7 @@ export function renderIndex(workspaces: Workspace[]): string {
 	);
 	return page(
 		"dev-task-board",
-		"<h1>Workspaces</h1>",
+		`${settingsLine()}<h1>Workspaces</h1>`,
 		`<div class="list">${rows.join("\n")}</div>`,
 	);
 }
@@ -616,7 +624,7 @@ export function renderOverview(
 	);
 	return page(
 		workspace.name,
-		`${tabs(workspaceNames, workspace.name)}<h1>${escapeHtml(workspace.name)}</h1>`,
+		`${tabs(workspaceNames, workspace.name) || settingsLine()}<h1>${escapeHtml(workspace.name)}</h1>`,
 		`<div class="list">${rows.join("\n")}</div>`,
 	);
 }
@@ -628,7 +636,9 @@ function projectHeading(
 ): string {
 	const way =
 		tabs(workspaceNames, workspaceName) ||
-		`<p class="meta"><a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a></p>`;
+		settingsLine(
+			`<a href="${href(workspaceName)}">${escapeHtml(workspaceName)}</a>`,
+		);
 	return `<header class="project">${way}<h1>${escapeHtml(projectName)}</h1></header>\n`;
 }
 
@@ -743,4 +753,87 @@ export function renderStarFailed(
 
 export function renderNotFound(): string {
 	return page("Not found", "<h1>Not found</h1>", "");
+}
+
+function hidden(name: string, value: string): string {
+	return `<input type="hidden" name="${name}" value="${escapeHtml(value)}">`;
+}
+
+// One button posting one action to the settings page.
+function settingsButton(
+	fields: string,
+	name: string,
+	value: string,
+	label: string,
+): string {
+	return `<form method="post" action="/settings" class="inline">${fields}<button type="submit" name="${name}" value="${escapeHtml(value)}">${label}</button></form>`;
+}
+
+function workspaceSettings(
+	workspace: SettingsView["workspaces"][number],
+	found: SettingsView["found"],
+): string {
+	const own = hidden("workspace", workspace.name);
+	const held = workspace.projects.map(
+		(project) =>
+			`<div class="row"><span class="name">${escapeHtml(project)}</span>${settingsButton(own, "remove", project, "Remove")}</div>`,
+	);
+	const offered = (found ?? [])
+		.filter(({ path }) => !workspace.paths.includes(path))
+		.map(
+			({ name }) =>
+				`<div class="row offered"><span class="name">${escapeHtml(name)}</span>${settingsButton(own, "add", name, "Add")}</div>`,
+		);
+	const byName = `<form method="post" action="/settings" class="row add">${own}<input name="add" value="" placeholder="group/project, or a path" aria-label="Add a project to ${escapeHtml(workspace.name)}"><button type="submit">Add</button></form>`;
+	const removal =
+		workspace.projects.length === 0
+			? settingsButton(
+					"",
+					"remove_workspace",
+					workspace.name,
+					"Remove workspace",
+				)
+			: "";
+	return `<section class="settings-workspace" id="workspace-${escapeHtml(encodeURIComponent(workspace.name))}">
+<h2>${escapeHtml(workspace.name)}</h2>
+<div class="list">${held.join("")}${held.length === 0 ? '<div class="row"><span class="meta">No projects yet.</span></div>' : ""}</div>
+${offered.length > 0 ? `<details class="found"><summary>Add from the projects folder (${offered.length})</summary><div class="list">${offered.join("")}</div></details>` : ""}
+<div class="list">${byName}</div>
+${removal}
+</section>`;
+}
+
+export function renderSettings(
+	view: SettingsView,
+	workspaceNames: string[] = [],
+): string {
+	const back =
+		workspaceNames.length > 0
+			? '<p class="meta"><a href="/">Board</a></p>'
+			: "";
+	const folder =
+		view.found === undefined
+			? `<div class="notice">The projects folder ${escapeHtml(view.projectsDir)} could not be read, so no repository is offered.</div>`
+			: "";
+	const fault =
+		view.fault === undefined
+			? ""
+			: `<div class="notice">${escapeHtml(view.fault)}</div>`;
+	const body = `${fault}<p class="meta">Projects folder: <code>${escapeHtml(view.projectsDir)}</code>. A project is named by its path in it, such as <code>group/project</code>.</p>
+${folder}${view.workspaces.map((workspace) => workspaceSettings(workspace, view.found)).join("\n")}
+<section class="settings-workspace"><h2>New workspace</h2><form method="post" action="/settings" class="row add"><input name="add_workspace" value="" placeholder="name" aria-label="New workspace's name"><button type="submit">Add workspace</button></form></section>
+<p class="meta">Each button saves the settings at once. Saving rewrites the settings file whole, without its comments.</p>`;
+	return page("Settings", `${back}<h1>Settings</h1>`, body);
+}
+
+export function renderSettingsRefused(status: number, reason: string): string {
+	const what =
+		status === 400
+			? "The settings were not changed"
+			: "The settings could not be saved";
+	return page(
+		what,
+		`<h1>${what}</h1>`,
+		`<div class="notice">${escapeHtml(reason)}</div>\n<p class="meta"><a href="/settings">Back to the settings</a></p>`,
+	);
 }
