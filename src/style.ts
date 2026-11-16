@@ -16,7 +16,8 @@ header.project h1 { line-height: 36px; padding-right: min(300px, 42%) }
 header.project::after { content: ""; position: absolute; left: -16px; right: -16px; top: 100%; height: 28px; background: linear-gradient(var(--bg), transparent); pointer-events: none }
 body > main > header:not(.project) { padding-top: 28px }
 [id] { scroll-margin-top: 140px }
-.stamp { /* the read time, at the right, level with the name under the workspace's link */ position: fixed; z-index: 11; top: 43.5px; right: max(16px, calc((100vw - 1180px) / 2 + 16px)); width: min(280px, 40%); min-height: 36px; color: var(--muted); font-size: 12px; line-height: 18px; margin: 0; overflow-wrap: anywhere; display: flex; align-items: center; justify-content: flex-end; text-align: right; gap: 6px }
+@media (max-width: 639px) { [id] { scroll-margin-top: 200px } }
+.stamp { /* the read time, at the right, level with the name under the workspace's link */ position: fixed; z-index: 11; top: 43.5px; right: max(16px, calc((100vw - 1180px) / 2)); width: min(280px, 40%); min-height: 36px; color: var(--muted); font-size: 12px; line-height: 18px; margin: 0; overflow-wrap: anywhere; display: flex; align-items: center; justify-content: flex-end; text-align: right; gap: 6px }
 .spin { display: inline-block; font-size: 15px; color: var(--work); animation: spin 1.2s linear infinite }
 body:has(.tabs) .stamp { /* or under the tabs */ top: 72.5px }
 @keyframes spin { to { transform: rotate(360deg) } }
