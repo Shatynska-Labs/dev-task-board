@@ -206,3 +206,5 @@ The 12 that pass now: D1–D5 (discriminators); T6 (static, discriminated by D4)
 **A test correction.** T5a/T5b looked for the name `one` from the start of the page, which finds `<title>one</title>` first, in `head`, where no heading can hold it; it now looks from `<body`. What it asserts is unchanged, and it fails with `position: sticky` taken out of the heading's rule.
 
 **Missing shared arrangement.** Every entry above is kept local: `share-the-test-arrangement` in `docs/backlog/` holds the decision to move this arrangement into `tests/support/`, and that entry gains this change's test file at archive.
+
+**The hand check (task 2.2, 2026-11-16).** Measured in headless Chromium from the built board's page, its held part shown and a quick part's stamp: the read time's top equals the name's at 1200px and 320px, with tabs (72.5px) and with a workspace's link (43.5px). At 320px the quick stamp takes three lines and grows 18px down over the heading's fade, as design decision 4 states; the held stamp keeps to the name's line.
