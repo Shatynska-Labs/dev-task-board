@@ -634,12 +634,6 @@ describe("A workstream shows its star", () => {
 			).toBe("star");
 			expect(html).not.toContain("<b>y");
 		});
-
-		it("carries no script", async () => {
-			const { port } = await serve();
-
-			expect(await pageOf(port, "/work/one")).not.toMatch(/<script\b/i);
-		});
 	});
 });
 

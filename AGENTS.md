@@ -148,7 +148,7 @@ Such a branch is created and left: it takes no working tree and does not become 
 <!-- ai-toolkit:project-foundation -->
 ## Testing Strategy
 
-Vitest, for its TypeScript support with no build step. Unit tests cover settings and rendering from document fixtures; integration tests run the server against fixture Git repositories and the carried tool, with a stub `gh` on `PATH`.
+Vitest, for its TypeScript support with no build step. Unit tests cover settings and rendering from document fixtures; integration tests run the server against fixture Git repositories and the carried tool, with a stub `gh` on `PATH`. The script a project's page carries is tested by running it, as the page carries it, in a `happy-dom` window holding markup the board renders, with `fetch` and `sessionStorage` under the test's control.
 
 - **Test command**: `npm test`
 - **Test-path glob**: `tests/**/*.test.ts`

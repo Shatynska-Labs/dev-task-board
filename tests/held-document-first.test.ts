@@ -523,7 +523,7 @@ describe("A project's page shows each read as it arrives", () => {
 	});
 
 	describe("Only the latest is seen", () => {
-		it("styles a page with a held part to hide every phase followed by another, with no script", async () => {
+		it("styles a page with a held part to hide every phase followed by another", async () => {
 			const { m, port } = await boardHolding();
 			m.release("quick");
 			m.release("full");
@@ -537,7 +537,6 @@ describe("A project's page shows each read as it arrives", () => {
 			expect(styles).toMatch(
 				/\.phase:has\(\s*~\s*\.phase\s*\)\s*\{[^}]*display\s*:\s*none/,
 			);
-			expect(body).not.toMatch(/<script\b/i);
 		});
 	});
 });

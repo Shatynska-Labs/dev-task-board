@@ -53,13 +53,16 @@ function projectPage(
 	project: string,
 	names: string[],
 	reads: BoardState["reads"],
-	starred: Set<string>,
+	// Called as each part is drawn, so a star set meanwhile shows in it.
+	starred: () => Set<string>,
 ): Streamed {
 	return async (response) => {
 		response.writeHead(200, HEADERS);
 		// Taken before the reads start, so it is what was held when asked.
 		const held = reads.get(workspace, project);
-		response.write(projectPageStart(workspace, project, names, held, starred));
+		response.write(
+			projectPageStart(workspace, project, names, held, starred()),
+		);
 		let fullEnded = false;
 		const full = reads.refresh(workspace, project).then(() => {
 			fullEnded = true;
@@ -67,10 +70,10 @@ function projectPage(
 		const quick = reads.quick(workspace, project);
 		const document = await Promise.race([quick, full.then(() => undefined)]);
 		if (document !== undefined && !fullEnded) {
-			response.write(quickPart(document, starred));
+			response.write(quickPart(document, starred()));
 		}
 		await full;
-		response.end(projectPageEnd(reads.get(workspace, project), starred));
+		response.end(projectPageEnd(reads.get(workspace, project), starred()));
 	};
 }
 
@@ -121,11 +124,7 @@ async function pageFor(
 	if (found === undefined) {
 		return undefined;
 	}
-	return projectPage(
-		workspace.name,
-		project,
-		names,
-		reads,
+	return projectPage(workspace.name, project, names, reads, () =>
 		stars.starred(found.path),
 	);
 }

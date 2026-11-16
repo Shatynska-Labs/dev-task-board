@@ -235,7 +235,6 @@ describe("A workstream shows its star", () => {
 			for (const button of starButtons(html)) {
 				expect(attribute(button, "form")).toBe("stars");
 			}
-			expect(html).not.toMatch(/<script\b/i);
 		});
 
 		it("shows alpha starred in both parts", async () => {

@@ -1,3 +1,4 @@
+import { pageScript } from "./page-script.js";
 import {
 	isFull,
 	type LatestRead,
@@ -69,7 +70,8 @@ function href(...names: string[]): string {
 
 const STAGES = ["plan", "build", "ship"];
 
-function layoutStart(title: string): string {
+// A project's page carries its script in the head, so each part can call it.
+function layoutStart(title: string, script = false): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -77,7 +79,7 @@ function layoutStart(title: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <style>${STYLE}</style>
-</head>
+${script ? `<script>(${pageScript.toString()})(window);</script>\n` : ""}</head>
 <body><main>
 `;
 }
@@ -229,6 +231,8 @@ function taskRow(
 		description?: string | null;
 		unplaced?: boolean;
 		number?: number;
+		// The workstream the row is listed under, none for a task in no workstream.
+		workstream?: string;
 	} = {},
 ): string {
 	const marks = [
@@ -245,7 +249,7 @@ function taskRow(
 	const line = `${statusMark(task.status)}<div>${stepNumber(options.number)}<span class="name">${escapeHtml(task.name)}</span>${marks}${taskNotes(task, options.description)}${warnings(task.warnings)}</div>${kindCell(task)}${needCell(task)}${waitsCell(task)}<span class="ago">${age(task, now)}</span>`;
 	const could = task.status !== "done" && task.need === "could" ? " could" : "";
 	return task.body
-		? `<li class="step${could}"><details class="task"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
+		? `<li class="step${could}"><details class="task" data-key="${escapeHtml(`task:${options.workstream ?? ""}:${task.name}`)}"><summary>${line}<span class="more"></span></summary>\n${taskBody(task.body)}</details></li>\n`
 		: `<li class="step rowgrid${could}">${line}<span></span></li>\n`;
 }
 
@@ -338,7 +342,11 @@ function renderStream(
 	const rows = stream.steps.map((step, index) => {
 		const task = tasks.find((entry) => entry.name === step.name);
 		return task
-			? taskRow(task, now, { description: step.description, number: index + 1 })
+			? taskRow(task, now, {
+					description: step.description,
+					number: index + 1,
+					workstream: stream.name,
+				})
 			: `<li class="step">${stepNumber(index + 1)}<span class="name">${escapeHtml(step.name)}</span></li>\n`;
 	});
 	const unplaced = tasks.filter(
@@ -363,10 +371,15 @@ function renderStream(
 		: "";
 	const id = shown.ids ? ` id="${escapeHtml(stream.name)}"` : "";
 	const star = starButton(stream.name, shown.starred.has(stream.name));
-	return `<details class="group"${id}><summary>${chevron()}<div><div class="name">${star}${escapeHtml(stream.name)}</div>${summary}${openCounts(stepTasks)}</div>${progress(stepTasks, unplaced)}</summary>
+	return `<details class="group"${id} data-key="${escapeHtml(`workstream:${stream.name}`)}"><summary>${chevron()}<div><div class="name">${star}${escapeHtml(stream.name)}</div>${summary}${openCounts(stepTasks)}</div>${progress(stepTasks, unplaced)}</summary>
 <div class="body">
 ${about}${warnings(stream.warnings)}<ol class="steps">
-${ROW_HEAD}${[...rows, ...unplaced.map((task) => taskRow(task, now, { unplaced: true }))].join("")}</ol>
+${ROW_HEAD}${[
+	...rows,
+	...unplaced.map((task) =>
+		taskRow(task, now, { unplaced: true, workstream: stream.name }),
+	),
+].join("")}</ol>
 </div></details>
 `;
 }
@@ -495,7 +508,7 @@ function renderDocument(document: BoardDocument, shown: Shown): string {
 		parts.push(
 			section(
 				`Other workstreams (${other.length})`,
-				`<details class="group"><summary>${chevron()}<div><div class="name">${other.length} workstream${other.length === 1 ? "" : "s"}</div><div class="sub">Nothing in work right now</div></div><span></span></summary><div class="body">${groups(other)}</div></details>`,
+				`<details class="group" data-key="other"><summary>${chevron()}<div><div class="name">${other.length} workstream${other.length === 1 ? "" : "s"}</div><div class="sub">Nothing in work right now</div></div><span></span></summary><div class="body">${groups(other)}</div></details>`,
 			),
 		);
 	}
@@ -503,7 +516,7 @@ function renderDocument(document: BoardDocument, shown: Shown): string {
 		parts.push(
 			section(
 				"Not in a workstream",
-				`<details class="group"${streams.length > 0 ? "" : " open"}><summary>${chevron()}<div><div class="name">${loose.length} task${loose.length === 1 ? "" : "s"}</div></div><span></span></summary><div class="body"><ul class="steps">\n${ROW_HEAD}${loose.map((task) => taskRow(task, now)).join("")}</ul></div></details>`,
+				`<details class="group" data-key="loose"${streams.length > 0 ? "" : " open"}><summary>${chevron()}<div><div class="name">${loose.length} task${loose.length === 1 ? "" : "s"}</div></div><span></span></summary><div class="body"><ul class="steps">\n${ROW_HEAD}${loose.map((task) => taskRow(task, now)).join("")}</ul></div></details>`,
 			),
 		);
 	}
@@ -621,7 +634,7 @@ function projectHeading(
 
 // One part of a project's page; the style shows only the last one sent.
 function phase(body: string): string {
-	return `<section class="phase">\n${body}\n</section>\n`;
+	return `<section class="phase">\n${body}\n</section>\n<script>dtbRestore();</script>\n`;
 }
 
 function projectState(
@@ -676,7 +689,7 @@ export function projectPageStart(
 	held?: ProjectState,
 	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase(heldPart(held, starred))}`;
+	return `${layoutStart(projectName, true)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase(heldPart(held, starred))}`;
 }
 
 // The page's one form, which every part's star buttons submit.
@@ -710,7 +723,7 @@ export function renderProject(
 	workspaceNames: string[] = [],
 	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${projectPageEnd(state, starred)}`;
+	return `${layoutStart(projectName, true)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${projectPageEnd(state, starred)}`;
 }
 
 export function renderStarFailed(

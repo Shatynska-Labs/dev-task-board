@@ -244,12 +244,10 @@ describe("A project's page shows its document", () => {
 
 describe("A page shows what was read for it", () => {
 	describe("No script", () => {
-		it("sends no script on any page", () => {
+		it("sends no script on an overview or the list of workspaces", () => {
 			const document = sectionsDocument();
 
 			for (const html of [
-				page(document),
-				renderProject("work", "alpha", failed("the tool refused")),
 				overview({ alpha: read(document) }),
 				renderIndex([{ name: "work", projects: [] }]),
 			]) {
