@@ -11,5 +11,5 @@
 
 ## 3. Record and release
 
-- [ ] 3.1 In `README.md`, say under Architecture and Status that a page holding a document shows it until the full read settles, with an update mark, and reads `git` alone only where nothing was held; in `docs/workstreams/see-my-projects-live.md`, add this change as step 9, before `write-the-settings`, and revise decision 1's account of the parts the same way, dated 2026-11-16; verify by reading both against `design.md`.
+- [x] 3.1 In `README.md`, say under Architecture and Status that a page holding a document shows it until the full read settles, with an update mark, and reads `git` alone only where nothing was held; in `docs/workstreams/see-my-projects-live.md`, add this change as step 9, before `write-the-settings`, and revise decision 1's account of the parts the same way, dated 2026-11-16; verify by reading both against `design.md`.
 - [ ] 3.2 Raise the version from `0.15.2` to `0.16.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run check:package` and `npm audit --audit-level=high`.
