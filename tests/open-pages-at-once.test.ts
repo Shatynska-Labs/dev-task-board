@@ -975,7 +975,7 @@ describe("A project's page shows each read as it arrives", () => {
 
 	describe("Only the latest is seen", () => {
 		it.each(["/work/one", "/work"])(
-			"styles %s to hide every phase followed by another, with no script",
+			"styles %s to hide every phase followed by another",
 			async (path) => {
 				const m = machine();
 				const { port } = await board(m, oneWorkspace);
@@ -988,7 +988,6 @@ describe("A project's page shows each read as it arrives", () => {
 				expect(styles).toMatch(
 					/\.phase:has\(\s*~\s*\.phase\s*\)\s*\{[^}]*display\s*:\s*none/,
 				);
-				expect(body).not.toMatch(/<script\b/i);
 			},
 		);
 	});

@@ -172,3 +172,11 @@ Design decision 7's superseded behaviour (stars taken once per request): this se
 | `quickThenFullBoard`, `documentOf` | `star-in-place-server` | a board over `createReads` and a stub tool whose page has a quick and a full part | `… One form for every part …` | `fixture.ts` gives the isolated environment only | `tests/stars-parts.test.ts` (`machine`, `board`) | `tests/support/fixture.ts` |
 | `parsed` | `star-in-place-server` | a parsed page with no script run | the key tests | none | none | `tests/support/browser.ts` |
 | `load` (the browser harness), `newTab`, `Tab`, `Call`, `redirected`, `answered`, `unreachable`, `settle`, `renderedOpen`, `starButton`, `order`, `showing`, `rendered`, `openStates`, `expectStarRequest` | `star-in-place-script` | a browser tab running the served page: fetch, session storage, layout reach, scroll events, faithful clicks | every test in that file | none | none | `tests/support/browser.ts` |
+
+## Obsolete tests: dispositions
+
+Each of the five was narrowed to what its modified requirement still says, changing no other assertion: 1, 2 and 3 lose their no-script assertion on a project's page (and 1 and 2 the words "with no script" from their names); 4 is removed, its whole subject being the project page's lack of a script; 5 keeps its overview and list-of-workspaces inputs and drops its project-page ones, renamed "sends no script on an overview or the list of workspaces". That an overview carries no script is also asserted by `tests/star-in-place-server.test.ts`'s "Only a project's page has a script".
+
+## Missing shared arrangement: dispositions
+
+Every entry above is **kept** local: each repeats helpers other test files declare locally (`stubStars`, a stub `reads`, a request helper, an HTTP client reading a page as it arrives, `phases`), which the backlog entry `share-the-test-arrangement` consolidates at once; promoting this change's copies alone would add a second shared version beside those. The browser harness (`load` and its helpers) is used by one file only, so there is nothing yet to share.
