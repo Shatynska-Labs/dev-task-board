@@ -411,7 +411,7 @@ function workRow(task: Task, now: number, partial: boolean): string {
 		streams.length > 0
 			? `<div class="ws">${streams.map((name) => `<a href="#${escapeHtml(encodeURIComponent(name))}">${escapeHtml(name)}</a>`).join("")}</div>`
 			: '<div class="ws none">no workstream</div>';
-	return `<div class="work"><div><div class="name">${escapeHtml(task.name)}</div>${summary}<div class="tags">${tags}</div></div><div><div class="pipe">${pipe(task.stage)}</div><span class="stage">${escapeHtml(task.stage ?? "")}</span>${partial ? '<span class="mark">pull requests not checked</span>' : ""}</div><div class="ago">${age(task, now)}</div>${stream}</div>
+	return `<div class="work"><div><div class="name">${escapeHtml(task.name)}</div>${summary}<div class="tags">${tags}</div></div><div><div class="pipe">${pipe(task.stage)}</div><span class="stage">${escapeHtml(task.stage ?? "")}</span>${partial ? '<span class="mark" title="Pull requests not checked">not checked</span>' : ""}</div><div class="ago">${age(task, now)}</div>${stream}</div>
 `;
 }
 

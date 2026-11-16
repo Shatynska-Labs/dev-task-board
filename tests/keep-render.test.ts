@@ -282,7 +282,7 @@ describe("A page marks a kept document", () => {
 			expect(text).toMatch(staleTrunk);
 			expect(text).toMatch(unreadBranches);
 			expect(text.slice(text.indexOf("kept-task"))).not.toContain(
-				"pull requests not checked",
+				"not checked",
 			);
 		});
 	});
