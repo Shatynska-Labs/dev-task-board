@@ -12,9 +12,18 @@ import {
 	renderIndex,
 	renderNotFound,
 	renderOverview,
+	renderSettings,
+	renderSettingsRefused,
 	renderStarFailed,
 } from "./render.js";
 import type { Workspace } from "./settings.js";
+import {
+	actionOf,
+	SaveFailed,
+	SaveRefused,
+	type SettingsAction,
+	type SettingsView,
+} from "./settings-file.js";
 import type { Stars } from "./stars.js";
 
 const HOST = "127.0.0.1";
@@ -24,6 +33,12 @@ export type BoardState = {
 	reads: Pick<Reads, "get" | "refresh" | "quick">;
 	// Absent, nothing is starred and no star can be kept.
 	stars?: Stars;
+	// Absent, there is no settings page.
+	settings?: {
+		view(): SettingsView;
+		// Saves the action and replaces the board's workspaces with the result.
+		save(action: SettingsAction): Promise<void>;
+	};
 };
 
 const NO_STARS: Stars = {
@@ -110,6 +125,11 @@ async function pageFor(
 		return undefined;
 	}
 	const [first = "", project] = segments;
+	if (first === "settings" && project === undefined) {
+		return state.settings === undefined
+			? undefined
+			: renderSettings(state.settings.view(), names);
+	}
 	if (first === "" && project === undefined) {
 		const [only, ...others] = workspaces;
 		if (only === undefined || others.length > 0) {
@@ -182,11 +202,7 @@ async function setStar(
 		answer(response, 404, renderNotFound());
 		return;
 	}
-	const { host, origin } = request.headers;
-	if (
-		request.headers["sec-fetch-site"] !== "same-origin" ||
-		origin !== `http://${host}`
-	) {
+	if (!fromOwnPage(request)) {
 		request.resume();
 		answer(response, 403, renderNotFound());
 		return;
@@ -242,11 +258,75 @@ async function setStar(
 	const address = [workspace.name, project.name]
 		.map(encodeURIComponent)
 		.join("/");
-	response.writeHead(303, {
-		...HEADERS,
-		location: `/${address}#${encodeURIComponent(stream)}`,
-	});
+	redirect(response, `/${address}#${encodeURIComponent(stream)}`);
+}
+
+// Whether a POST comes from the board's own page.
+function fromOwnPage(request: IncomingMessage): boolean {
+	const { host, origin } = request.headers;
+	return (
+		request.headers["sec-fetch-site"] === "same-origin" &&
+		origin === `http://${host}`
+	);
+}
+
+function redirect(response: ServerResponse, location: string): void {
+	response.writeHead(303, { ...HEADERS, location });
 	response.end();
+}
+
+// A save from the settings page: the checks in the order the specification
+// gives, the first that fails deciding the answer and the file unchanged.
+async function saveSettings(
+	request: IncomingMessage,
+	response: ServerResponse,
+	state: BoardState,
+): Promise<void> {
+	const { settings } = state;
+	if (settings === undefined) {
+		request.resume();
+		answer(response, 404, renderNotFound());
+		return;
+	}
+	if (!fromOwnPage(request)) {
+		request.resume();
+		answer(response, 403, renderNotFound());
+		return;
+	}
+	const body = await bodyOf(request);
+	if (body === "aborted") {
+		response.destroy();
+		return;
+	}
+	if (body === "long") {
+		answer(response, 413, renderNotFound());
+		return;
+	}
+	const action = actionOf([...new URLSearchParams(body)]);
+	if (action === undefined) {
+		answer(
+			response,
+			400,
+			renderSettingsRefused(400, "a save takes exactly one action"),
+		);
+		return;
+	}
+	try {
+		await settings.save(action);
+	} catch (error) {
+		if (error instanceof SaveRefused || error instanceof SaveFailed) {
+			const status = error instanceof SaveRefused ? 400 : 500;
+			answer(response, status, renderSettingsRefused(status, error.message));
+			return;
+		}
+		throw error;
+	}
+	redirect(
+		response,
+		action.kind === "remove_workspace"
+			? "/settings"
+			: `/settings#workspace-${encodeURIComponent(action.workspace)}`,
+	);
 }
 
 export function startServer(
@@ -264,8 +344,19 @@ export function startServer(
 			answer(response, 403, renderNotFound());
 			return;
 		}
+		const path = (request.url ?? "").split("?")[0];
 		if (request.method === "POST") {
-			await setStar(request, response, state);
+			await (path === "/settings"
+				? saveSettings(request, response, state)
+				: setStar(request, response, state));
+			return;
+		}
+		if (
+			request.method === "GET" &&
+			path === "/" &&
+			state.workspaces.length === 0
+		) {
+			redirect(response, "/settings");
 			return;
 		}
 		const page =
