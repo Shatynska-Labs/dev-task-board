@@ -705,7 +705,7 @@ describe("A project's page shows its document", () => {
 				const body = await open(port, "/work/one").end;
 
 				const head = beforePhases(body);
-				const name = textNodeAt(head, "one");
+				const name = textNodeAt(head, "one", head.indexOf("<body"));
 				expect(name).toBeGreaterThan(-1);
 				expect(heldAtTop(body, name)).toBe(true);
 				for (const link of links) {

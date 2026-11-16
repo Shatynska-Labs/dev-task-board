@@ -192,3 +192,17 @@ After adding `tests/hold-the-page-while-reading.test.ts`: 38 files, 653 passed, 
 - T11, T14: three parts, a quick part after the held one. T18: a quick run starts with a document held.
 
 The 12 that pass now: D1–D5 (discriminators); T6 (static, discriminated by D4); T8, T9, T10, T15, T16, T17, which state behaviour for a project holding no document that this change leaves as it is, so code that already exists satisfies them.
+
+## Dispositions (recorded in build, 2026-11-16)
+
+**Obsolete tests.**
+
+- `held-document-first` "A held document > sends, before the reads end, …": its line assertion becomes `Read <time>`, the MODIFIED requirement's read time; the mark is T2's.
+- `held-document-first` "Held, then the reads", "Quick, then full", "Full first" and "A quick read that fails": removed. Each held a document and waited on a quick read that no longer starts; the scenarios as modified are covered by T11 (held, then full, no quick part) and T8–T10 (the same three scenarios for a project holding no document). Their now unused helpers `startsOf`, `utc` and the `Machine` type went with them.
+- `open-pages-at-once` "A quick read is not held": arranged with nothing held (no `reads.start()`), waiting on two starts; it asserts as before that the quick read changes nothing held.
+- `open-pages-at-once` "Quick, then full": `GitHub` is now in the mark's name, so the visible-text `/GitHub/` becomes the part holding `aria-label="GitHub still being read"`.
+- `part-layout`: the two stamp patterns admit the mark before the text, and the fixed-height check reads the stamp's `position: fixed` and `min-height: 36px`, which replace `position: absolute` and `height: 36px`.
+
+**A test correction.** T5a/T5b looked for the name `one` from the start of the page, which finds `<title>one</title>` first, in `head`, where no heading can hold it; it now looks from `<body`. What it asserts is unchanged, and it fails with `position: sticky` taken out of the heading's rule.
+
+**Missing shared arrangement.** Every entry above is kept local: `share-the-test-arrangement` in `docs/backlog/` holds the decision to move this arrangement into `tests/support/`, and that entry gains this change's test file at archive.

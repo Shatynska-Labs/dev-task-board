@@ -618,14 +618,13 @@ describe("A project's page starts a quick read beside the full one", () => {
 	describe("A quick read is not held", () => {
 		it("holds what it held before the request after the quick read ends", async () => {
 			const m = machine();
-			const { reads, port } = await board(m, oneWorkspace);
-			await reads.start();
-			const before = reads.get("work", "one");
 			m.hold("full");
 			m.hold("quick");
+			const { reads, port } = await board(m, oneWorkspace);
+			const before = reads.get("work", "one");
 
 			const opened = open(port, "/work/one");
-			await waitUntil(() => started(m).length === 3);
+			await waitUntil(() => started(m).length === 2);
 			m.release("quick");
 			await waitUntil(() => opened.received().includes("quick-task"));
 
@@ -923,7 +922,7 @@ describe("A project's page shows each read as it arrives", () => {
 			expect(parts[0]).not.toContain("quick-task");
 			expect(parts[1]).toContain("quick-task");
 			expect(parts[1]).toMatch(/git alone/i);
-			expect(parts[1]).toMatch(/GitHub/);
+			expect(phases(body)[1]).toContain('aria-label="GitHub still being read"');
 			expect(parts[1]).toMatch(/statuses may be wrong/i);
 			expect(parts[2]).toContain("full-task");
 			expect(parts[2]).not.toContain("quick-task");
