@@ -1,3 +1,4 @@
+import { pageScript } from "./page-script.js";
 import {
 	isFull,
 	type LatestRead,
@@ -69,7 +70,8 @@ function href(...names: string[]): string {
 
 const STAGES = ["plan", "build", "ship"];
 
-function layoutStart(title: string): string {
+// A project's page carries its script in the head, so each part can call it.
+function layoutStart(title: string, script = false): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -77,7 +79,7 @@ function layoutStart(title: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <style>${STYLE}</style>
-</head>
+${script ? `<script>(${pageScript.toString()})(window);</script>\n` : ""}</head>
 <body><main>
 `;
 }
@@ -632,7 +634,7 @@ function projectHeading(
 
 // One part of a project's page; the style shows only the last one sent.
 function phase(body: string): string {
-	return `<section class="phase">\n${body}\n</section>\n`;
+	return `<section class="phase">\n${body}\n</section>\n<script>dtbRestore();</script>\n`;
 }
 
 function projectState(
@@ -687,7 +689,7 @@ export function projectPageStart(
 	held?: ProjectState,
 	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase(heldPart(held, starred))}`;
+	return `${layoutStart(projectName, true)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${phase(heldPart(held, starred))}`;
 }
 
 // The page's one form, which every part's star buttons submit.
@@ -721,7 +723,7 @@ export function renderProject(
 	workspaceNames: string[] = [],
 	starred: Set<string> = new Set(),
 ): string {
-	return `${layoutStart(projectName)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${projectPageEnd(state, starred)}`;
+	return `${layoutStart(projectName, true)}${projectHeading(workspaceName, projectName, workspaceNames)}${starsForm(workspaceName, projectName)}${projectPageEnd(state, starred)}`;
 }
 
 export function renderStarFailed(
