@@ -22,6 +22,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; display: grid
   .stamp { position: absolute; right: 0; top: -68px; width: 280px; height: 36px; justify-content: flex-end; text-align: right }
 }
 header { display: grid; gap: 4px }
+/* The stars form holds no field, and takes no row of main's grid. */
+#stars { display: none }
 h1 { font-size: 24px; margin: 0 }
 .phase { display: grid; gap: 32px }
 .phase:has(~ .phase) { display: none }

@@ -38,3 +38,7 @@ See `proposal.md` for why. A project's page is sent in parts (`section.phase`), 
 - The star in a part still arriving is turned over, but a later part draws from the stars at that time; decision 7 makes that agree.
 - A key from a task's name collides where one workstream lists the same task twice; both rows then open together, which is harmless.
 - A remembered position past the end of a shorter page scrolls to its end; each later part tries again until the operator scrolls.
+
+## After the merge (2026-11-16)
+
+Trying 0.15.0, the operator found the risk named above: a reload landed right at first, jumped up while the quick part showed, and came back once the last part arrived. The cause was the quick part's mark, a block above the document that the other parts lack, so the same position showed rows further up. The fix, in a pull request of its own, puts the mark in the stamp beside the name and gives every stamp one fixed two-line block. In the same report the operator asked that the read time sit beside the name again, from which it had dropped a line since `star-workstreams` added the page's empty stars form, which took a row of the page's grid; that form is hidden, in a commit of its own, at the operator's request rather than as folded-in work.

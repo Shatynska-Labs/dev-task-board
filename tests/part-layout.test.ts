@@ -1,7 +1,7 @@
 // The parts of a project's page start their document at the same height, so a
 // position restored in one part shows the same rows in the next.
 import { describe, expect, it } from "vitest";
-import { quickPart } from "../src/render.js";
+import { projectPageStart, quickPart } from "../src/render.js";
 import { STYLE } from "../src/style.js";
 import { fullDocument, workstream } from "./support/document.js";
 
@@ -34,5 +34,12 @@ describe("the parts of a project's page", () => {
 	it("gives every stamp one fixed height, so no part's document starts lower", () => {
 		expect(STYLE).toMatch(/\.stamp \{[^}]*min-height: 36px/);
 		expect(STYLE).toMatch(/position: absolute;[^}]*[^-]height: 36px/);
+	});
+});
+
+describe("the stars form", () => {
+	it("is hidden, so the first part follows the heading directly and its stamp sits beside the name", () => {
+		expect(projectPageStart("work", "board")).toContain('<form id="stars"');
+		expect(STYLE).toMatch(/#stars\s*\{\s*display:\s*none\s*\}/);
 	});
 });
