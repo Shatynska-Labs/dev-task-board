@@ -14,3 +14,7 @@
 
 - [x] 3.1 In `README.md`, revise "with no script" under Technology and "the page needs no script" under Architecture to say what the project page's script does and that the page works without it, and say under Status that a star is set in place and a reload reopens what was open; in `docs/workstreams/see-my-projects-live.md`, revise decision 1's "pages carry no script" the same way, dated 2026-11-16; verify by reading both against `design.md`.
 - [x] 3.2 Raise the version from `0.14.0` to `0.15.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run check:package` and `npm audit --audit-level=high`.
+
+## 4. Confirm
+
+- [x] 4.1 The operator merged #41 and ran 0.15.0: a star changed in place and a reload reopened what was open, but the reload jumped while it was read, and the read time sat a line below the name. #42 (0.15.1) moved the quick part's mark into the stamp and hid the stars form; #43 (0.15.2) shortened `pull requests not checked` to `not checked`, as the operator asked. The jump remained, because the quick part listed more tasks in work than the full read, and `hold-the-page-while-reading` took it up (#44, 0.16.0). On 2026-11-16 the operator ran 0.16.0, which carries this change's script and those fixes, and reported that everything worked.
