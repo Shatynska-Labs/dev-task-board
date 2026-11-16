@@ -2,13 +2,13 @@
 
 ## 1. Settings
 
-- [ ] 1.1 In `src/settings.ts`, read `projects_dir` and names relative to it, allow empty workspaces and no workspace, reserve `settings`, and read a missing file as empty settings (design decisions 1, 2 and 7); verify with the derived tests for `settings`.
-- [ ] 1.2 In `src/settings.ts`, apply one action to the file's table and write the result whole, read back as at start, one save at a time (design decision 5); verify with the derived tests for "Saving the settings".
+- [x] 1.1 In `src/settings.ts`, read `projects_dir` and names relative to it, allow empty workspaces and no workspace, reserve `settings`, and read a missing file as empty settings (design decisions 1, 2 and 7); verify with the derived tests for `settings`.
+- [x] 1.2 In `src/settings.ts`, apply one action to the file's table and write the result whole, read back as at start, one save at a time (design decision 5); verify with the derived tests for "Saving the settings".
 
 ## 2. Reads and server
 
-- [ ] 2.1 In `src/reads.ts`, add `replace(workspaces)` (design decision 6); verify with the derived tests for "Reads follow saved settings".
-- [ ] 2.2 In `src/server.ts` and `src/board.ts`, start with no settings file, answer `/` with `303` to `/settings` where there is no workspace, serve `GET /settings` and `POST /settings`, and replace the board's workspaces after a save (design decisions 2, 5 and 6); verify with the derived tests for "No settings file starts the board empty", "The settings page" and "Saving the settings".
+- [x] 2.1 In `src/reads.ts`, add `replace(workspaces)` (design decision 6); verify with the derived tests for "Reads follow saved settings".
+- [x] 2.2 In `src/server.ts` and `src/board.ts`, start with no settings file, answer `/` with `303` to `/settings` where there is no workspace, serve `GET /settings` and `POST /settings`, and replace the board's workspaces after a save (design decisions 2, 5 and 6); verify with the derived tests for "No settings file starts the board empty", "The settings page" and "Saving the settings".
 
 ## 3. The page
 

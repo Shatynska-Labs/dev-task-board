@@ -185,3 +185,16 @@ The dispatch named `tests/support/` (`build.ts`, `document.ts`, `fixture.ts`, `p
 7. `loggingGh`, `lines`, `pidsIn` in `tests/settings-page-board.test.ts`: stand in for a `gh` that records where it ran and can hold a read. Used by SPB scenarios 49 to 51. Near-miss: the `gh` stub `isolatedEnvironment` writes, which logs nothing and cannot hold. Found in `tests/board.test.ts` (`slowGh`, `lines`, `pidsIn`). Proposed home: `tests/support/fixture.ts`.
 8. `submissions`, `offered`, `removable`, `removableWorkspaces`, `idsOf`, `linksToSettings` in `tests/settings-page-board.test.ts`: stand in for reading what the page's forms would post. Used by SPB scenarios 19 to 25, 34, 35, 43 and "shows the projects folder, ...". Near-miss: `tests/support/page.ts` (`attribute`, `blocks`, used by them), which reads no forms. Similar in `tests/stars-server.test.ts` (`buttons`, `formsWithId`). Proposed home: `tests/support/page.ts`.
 9. `savedSettings`, `Saved` in `tests/settings-page-board.test.ts`: stand in for reading the saved file with `smol-toml`. Used by SPB scenarios 25 to 27, 36 and "keeps every one of several saves posted at once". No near-miss. Proposed home: `tests/support/settings.ts`.
+
+## Dispositions (recorded in build, 2026-11-16)
+
+**Obsolete tests.**
+
+- `tests/board.test.ts` "Missing file > exits non-zero, naming the path, the table and projects": removed; a missing file now starts the board, which "No settings file starts the board empty" covers.
+- `tests/board.test.ts` "looks under ~/.config where XDG_CONFIG_HOME is unset" and "… is empty": the block is renamed "Where the file is looked for", and each now places a file that is not valid TOML under `~/.config`, so the start is still refused naming that path; what they assert is unchanged.
+- `tests/settings.test.ts` "refuses no workspace", "refuses an empty workspaces table" and "refuses an empty projects": removed from the table; each is now valid, as "Empty" asserts.
+- `tests/settings.test.ts` "refuses the relative path relative/path, naming it": `relative/path` removed from the list, being now a name in the projects folder. `./relative`, `~` and `~someone/path` stay refused: a name beginning `~` is not taken as a name in the folder, so `~` stays the home directory's mark only, which answers the test author's question.
+
+**An empty `[workspaces]` table** is read as no workspace, as the test author asked.
+
+**Missing shared arrangement.** Every entry is kept local: `share-the-test-arrangement` in `docs/backlog/` holds the move to `tests/support/`, and gains these two files at archive.

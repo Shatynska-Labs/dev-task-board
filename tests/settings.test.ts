@@ -99,18 +99,15 @@ describe("Bad settings refuse the start", () => {
 	describe("Faults of the file's shape", () => {
 		it.each([
 			["text that is not TOML", "[workspaces\n"],
-			["no workspace", ""],
-			["an empty workspaces table", "[workspaces]\n"],
 			["workspaces that is not a table", "workspaces = 1\n"],
 			["a missing projects", "[workspaces.work]\n"],
-			["an empty projects", "[workspaces.work]\nprojects = []\n"],
 			["a projects that is not a list", '[workspaces.work]\nprojects = "/a"\n'],
 			["a projects of non-strings", "[workspaces.work]\nprojects = [1]\n"],
 		])("refuses %s", (_name, text) => {
 			refusal(text, everyPathADirectory);
 		});
 
-		it.each(["relative/path", "./relative", "~", "~someone/path"])(
+		it.each(["./relative", "~", "~someone/path"])(
 			"refuses the relative path %s, naming it",
 			(path) => {
 				const error = refusal(workspace("work", [path]), everyPathADirectory);

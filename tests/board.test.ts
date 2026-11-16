@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { createServer, type Server } from "node:net";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -386,19 +386,7 @@ describe("The server is local and refuses other hosts", () => {
 });
 
 describe("Bad settings refuse the start", () => {
-	describe("Missing file", () => {
-		it("exits non-zero, naming the path, the table and projects", () => {
-			const root = temporaryDirectory();
-			const env = isolatedEnvironment(root);
-
-			const result = run([], env);
-
-			expectRefused(result);
-			expect(result.stderr).toContain(settingsFile(env));
-			expect(result.stderr).toContain("[workspaces.<name>]");
-			expect(result.stderr).toContain("projects");
-		});
-
+	describe("Where the file is looked for", () => {
 		it.each([
 			["unset", undefined],
 			["empty", ""],
@@ -408,6 +396,15 @@ describe("Bad settings refuse the start", () => {
 				...isolatedEnvironment(root),
 				XDG_CONFIG_HOME: value,
 			};
+			// A file that cannot be read, so the start is refused naming it.
+			const file = join(
+				String(env.HOME),
+				".config",
+				"dev-task-board",
+				"config.toml",
+			);
+			mkdirSync(dirname(file), { recursive: true });
+			writeFileSync(file, "[workspaces\n");
 
 			const result = run([], env);
 
