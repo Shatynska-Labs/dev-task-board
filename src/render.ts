@@ -701,11 +701,14 @@ export function quickPart(
 	document: ProjectDocument,
 	starred: Set<string> = new Set(),
 ): string {
+	// The mark sits where the other parts' stamp does, beside the name, so the
+	// document starts at the same height in every part.
 	const others = whatMissed(document, { forge: false })
 		.map((line) => `<span>${escapeHtml(line)}</span>`)
 		.join("");
+	const notice = others === "" ? "" : `<div class="notice">${others}</div>\n`;
 	return phase(
-		`<div class="notice"><span>Read from git alone: GitHub is still being read, so statuses may be wrong.</span>${others}</div>\n${renderDocument(document as BoardDocument, { starred, ids: false })}`,
+		`<p class="stamp">Read from git alone; GitHub still being read, so statuses may be wrong.</p>\n${notice}${renderDocument(document as BoardDocument, { starred, ids: false })}`,
 	);
 }
 
