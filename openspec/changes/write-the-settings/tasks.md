@@ -16,5 +16,5 @@
 
 ## 4. Record and release
 
-- [ ] 4.1 In `README.md`, revise Scope's setup command, Non-Goals' scanning of folders, Architecture's settings and Running it for the page and `projects_dir`, and that a workspace named `settings` is refused from 0.17.0; in `docs/workstreams/see-my-projects-live.md`, revise step 10 to the settings page; verify by reading both against `design.md`.
+- [x] 4.1 In `README.md`, revise Scope's setup command, Non-Goals' scanning of folders, Architecture's settings and Running it for the page and `projects_dir`, and that a workspace named `settings` is refused from 0.17.0; in `docs/workstreams/see-my-projects-live.md`, revise step 10 to the settings page; verify by reading both against `design.md`.
 - [ ] 4.2 Raise the version from `0.16.0` to `0.17.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run check:package` and `npm audit --audit-level=high`.

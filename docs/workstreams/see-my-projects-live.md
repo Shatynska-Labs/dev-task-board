@@ -15,7 +15,7 @@
 7. `show-the-held-document-first` — a project's page opens on what was last read, with its age, while it is read again.
 8. `star-without-reloading` — a star set in place on a project's page, and a reload that reopens what was open.
 9. `hold-the-page-while-reading` — a project's page keeps what it shows until the full read settles, with an update mark and its heading held at the top.
-10. `write-the-settings` — the setup command.
+10. `write-the-settings` — a settings page in the board: projects named in one projects folder, added from the repositories found there, and saved without a restart.
 
 - **Not in scope**: what `README.md`'s Non-Goals name, among them editing tasks from the page and reading uncommitted work.
 - **Open questions**: none
