@@ -12,7 +12,8 @@
 4. `say-what-a-read-missed` — failed, degraded and unknown-version reads: the last document kept, with its age, the reason and what could not be read.
 5. `switch-between-workspaces` — several named workspaces as tabs, and an optional `github_account` for each.
 6. `open-pages-at-once` — an overview drawn from what is held, and a project's page that shows what `git` gives first and the full read after, in one response.
-7. `write-the-settings` — the setup command.
+7. `show-the-held-document-first` — a project's page opens on what was last read, with its age, while it is read again.
+8. `write-the-settings` — the setup command.
 
 - **Not in scope**: what `README.md`'s Non-Goals name, among them editing tasks from the page and reading uncommitted work.
 - **Open questions**: none
