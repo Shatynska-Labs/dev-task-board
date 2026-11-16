@@ -198,3 +198,5 @@ The dispatch named `tests/support/` (`build.ts`, `document.ts`, `fixture.ts`, `p
 **An empty `[workspaces]` table** is read as no workspace, as the test author asked.
 
 **Missing shared arrangement.** Every entry is kept local: `share-the-test-arrangement` in `docs/backlog/` holds the move to `tests/support/`, and gains these two files at archive.
+
+**The hand check (task 3.1, 2026-11-16).** The built board, run with a copy of the operator's settings and their `~/projects`: the page lists both workspaces with their projects as written and folds the repositories found (25 and 26) into "Add from the projects folder"; adding `fuperia/actions` answered 303 to `/settings#workspace-fuperia`, the copy listed it, and `/fuperia` linked to it with no restart; removing it answered 303 and `/fuperia/actions` answered 404. Every page shows the settings link, at the end of the tabs.

@@ -12,9 +12,9 @@
 
 ## 3. The page
 
-- [ ] 3.1 In `src/render.ts` and `src/style.ts`, render the settings page and its refusal, list the repositories found (design decisions 3 and 4), and link it from every page; verify with the derived tests for "The settings page", and by hand against the running board with the operator's projects folder.
+- [x] 3.1 In `src/render.ts` and `src/style.ts`, render the settings page and its refusal, list the repositories found (design decisions 3 and 4), and link it from every page; verify with the derived tests for "The settings page", and by hand against the running board with the operator's projects folder.
 
 ## 4. Record and release
 
 - [x] 4.1 In `README.md`, revise Scope's setup command, Non-Goals' scanning of folders, Architecture's settings and Running it for the page and `projects_dir`, and that a workspace named `settings` is refused from 0.17.0; in `docs/workstreams/see-my-projects-live.md`, revise step 10 to the settings page; verify by reading both against `design.md`.
-- [ ] 4.2 Raise the version from `0.16.0` to `0.17.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run check:package` and `npm audit --audit-level=high`.
+- [x] 4.2 Raise the version from `0.16.0` to `0.17.0` in `package.json` and `package-lock.json`; verify with `npm run check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run check:package` and `npm audit --audit-level=high`.
