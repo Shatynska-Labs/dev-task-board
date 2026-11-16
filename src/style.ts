@@ -10,17 +10,18 @@ export const STYLE = `
   --bg: #12191e; --panel: #1a242a; --fg: #e4ebee; --muted: #93a3ac; --line: #2e3c44;
   --done: #5bb78f; --work: #7fb0f5; --work-soft: #1f3250; --warn: #e3a955; --warn-soft: #3c2e17; color-scheme: dark } }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.5 }
-main { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 32px }
-/* Two lines in one heading's line (36px) in every part, so each part's
-   document starts at the same height and a restored position holds. */
-.stamp { color: var(--muted); font-size: 12px; line-height: 18px; min-height: 36px; margin: 0; overflow-wrap: anywhere; display: flex; align-items: center }
-/* Level with the name: up by main's gap (32px) and the heading's line (36px),
-   measured from the top of the part, so the tabs above never move it. */
-@media (min-width: 640px) {
-  header.project h1 { padding-right: 300px }
-  .phase { position: relative }
-  .stamp { position: absolute; right: 0; top: -68px; width: 280px; height: 36px; justify-content: flex-end; text-align: right }
-}
+main { max-width: 1180px; margin: 0 auto; padding: 0 16px 56px; display: grid; gap: 32px }
+header.project { /* held at the top, fading into the page below */ position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 20px 0 8px; margin-bottom: -16px }
+header.project h1 { line-height: 36px; padding-right: min(300px, 42%) }
+header.project::after { content: ""; position: absolute; left: -16px; right: -16px; top: 100%; height: 28px; background: linear-gradient(var(--bg), transparent); pointer-events: none }
+body > main > header:not(.project) { padding-top: 28px }
+[id] { scroll-margin-top: 140px }
+@media (max-width: 639px) { [id] { scroll-margin-top: 200px } }
+.stamp { /* the read time, at the right, level with the name under the workspace's link */ position: fixed; z-index: 11; top: 43.5px; right: max(16px, calc((100vw - 1180px) / 2)); width: min(280px, 40%); min-height: 36px; color: var(--muted); font-size: 12px; line-height: 18px; margin: 0; overflow-wrap: anywhere; display: flex; align-items: center; justify-content: flex-end; text-align: right; gap: 6px }
+.spin { display: inline-block; font-size: 15px; color: var(--work); animation: spin 1.2s linear infinite }
+body:has(.tabs) .stamp { /* or under the tabs */ top: 72.5px }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none } }
 header { display: grid; gap: 4px }
 /* The stars form holds no field, and takes no row of main's grid. */
 #stars { display: none }

@@ -642,7 +642,7 @@ function projectState(
 	starred: Set<string>,
 ): string {
 	if (state === undefined || state.state === "reading") {
-		return '<p class="meta">This project is being read.</p>';
+		return '<p class="stamp"><span class="spin" role="img" title="Being read" aria-label="Being read">↻</span>Being read</p><p class="meta">This project is being read.</p>';
 	}
 	if (state.state === "failed") {
 		return `<div class="notice">The read failed: ${escapeHtml(state.reason)}</div>`;
@@ -673,10 +673,10 @@ function heldPart(
 	starred: Set<string>,
 ): string {
 	if (state?.state !== "read") {
-		return '<p class="meta">This project is being read.</p>';
+		return '<p class="stamp"><span class="spin" role="img" title="Being read" aria-label="Being read">↻</span>Being read</p><p class="meta">This project is being read.</p>';
 	}
 	return heldDocument(state, starred, {
-		stamp: `Shown as read ${readTime(state.readAt)}; being read again.`,
+		stamp: `<span class="spin" role="img" title="Being read again" aria-label="Being read again">↻</span>Read ${readTime(state.readAt)}`,
 		ids: false,
 	});
 }
@@ -708,7 +708,7 @@ export function quickPart(
 		.join("");
 	const notice = others === "" ? "" : `<div class="notice">${others}</div>\n`;
 	return phase(
-		`<p class="stamp">Read from git alone; GitHub still being read, so statuses may be wrong.</p>\n${notice}${renderDocument(document as BoardDocument, { starred, ids: false })}`,
+		`<p class="stamp"><span class="spin" role="img" title="GitHub still being read" aria-label="GitHub still being read">↻</span>Read from git alone; statuses may be wrong.</p>\n${notice}${renderDocument(document as BoardDocument, { starred, ids: false })}`,
 	);
 }
 

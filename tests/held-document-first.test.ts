@@ -283,8 +283,6 @@ function machine() {
 	};
 }
 
-type Machine = ReturnType<typeof machine>;
-
 // A board over the machine that has read the project once, holding a
 // document whose one task is held-task; then the next full read prints
 // full-task and the next quick read quick-task, each held until released.
@@ -317,14 +315,6 @@ async function boardHolding() {
 	return { m, port, readAt: held.readAt };
 }
 
-function startsOf(m: Machine): number {
-	return m.log().filter((line) => line.startsWith("start ")).length;
-}
-
-function utc(at: string): string {
-	return `${new Date(at).toISOString().slice(0, 19).replace("T", " ")} UTC`;
-}
-
 afterEach(async () => {
 	for (const sent of outgoing.splice(0)) {
 		sent.destroy();
@@ -347,9 +337,7 @@ describe("The first part shows what is held", () => {
 			expect(opened.ended()).toBe(false);
 			expect(phases(received)).toHaveLength(1);
 			expect(textOf(first)).toContain("held-task");
-			expect(shown(first)).toContain(
-				`Shown as read ${documentReadShown}; being read again.`,
-			);
+			expect(shown(first)).toContain(`Read ${documentReadShown}`);
 			const alpha = starButtons(first).filter(
 				(button) => attribute(button, "value") === "alpha",
 			);
@@ -416,33 +404,6 @@ describe("The first part shows what is held", () => {
 			},
 		);
 	});
-
-	describe("Held, then the reads", () => {
-		it("holds the held part, then the quick part, then the full document, in that order", async () => {
-			const { m, port, readAt } = await boardHolding();
-
-			const opened = open(port, "/work/one");
-			await waitUntil(() => startsOf(m) === 3);
-			m.release("quick");
-			await waitUntil(() => opened.received().includes("quick-task"));
-			expect(opened.ended()).toBe(false);
-			m.release("full");
-			const body = await opened.end;
-
-			const parts = phases(body);
-			expect(parts).toHaveLength(3);
-			const [held, quick, full] = parts.map(shown);
-			expect(held).toContain("held-task");
-			expect(held).toContain(`Shown as read ${utc(readAt)}; being read again.`);
-			expect(held).not.toContain("quick-task");
-			expect(held).not.toContain("full-task");
-			expect(quick).toContain("quick-task");
-			expect(quick).toMatch(/git alone/i);
-			expect(full).toContain("full-task");
-			expect(full).not.toContain("held-task");
-			expect(full).not.toContain("quick-task");
-		});
-	});
 });
 
 describe("A project's page shows each read as it arrives", () => {
@@ -458,67 +419,6 @@ describe("A project's page shows each read as it arrives", () => {
 			expect(addresses(head)).toEqual(expect.arrayContaining(["/a", "/b"]));
 			expect(textOf(head)).toContain("one");
 			expect(textOf(first)).toContain("held-task");
-		});
-	});
-
-	describe("Quick, then full", () => {
-		it("holds the first part, then the quick document marked as from git alone, then the full document", async () => {
-			const { m, port } = await boardHolding();
-
-			const opened = open(port, "/work/one");
-			await waitUntil(() => startsOf(m) === 3);
-			m.release("quick");
-			await waitUntil(() => opened.received().includes("quick-task"));
-			m.release("full");
-			const body = await opened.end;
-
-			const parts = phases(body).map(shown);
-			expect(parts).toHaveLength(3);
-			expect(parts[0]).toContain("held-task");
-			expect(parts[1]).toContain("quick-task");
-			expect(parts[1]).toMatch(/git alone/i);
-			expect(parts[1]).toMatch(/GitHub/);
-			expect(parts[1]).toMatch(/statuses may be wrong/i);
-			expect(parts[2]).toContain("full-task");
-		});
-	});
-
-	describe("Full first", () => {
-		it("holds the first part and then the full document, and no quick part", async () => {
-			const { m, port } = await boardHolding();
-
-			const opened = open(port, "/work/one");
-			await waitUntil(() => startsOf(m) === 3);
-			m.release("full");
-			const body = await opened.end;
-			m.release("quick");
-
-			const parts = phases(body).map(shown);
-			expect(parts).toHaveLength(2);
-			expect(parts[0]).toContain("held-task");
-			expect(parts[1]).toContain("full-task");
-			expect(body).not.toContain("quick-task");
-			expect(shown(body)).not.toMatch(/git alone/i);
-		});
-	});
-
-	describe("A quick read that fails", () => {
-		it("adds no part saying the quick read failed", async () => {
-			const { m, port } = await boardHolding();
-			m.fail("quick");
-			m.release("quick");
-
-			const opened = open(port, "/work/one");
-			await waitUntil(() => m.log().some((line) => line === "end quick"));
-			await delay(200);
-			m.release("full");
-			const body = await opened.end;
-
-			expect(body).not.toContain("quick-refused");
-			const parts = phases(body).map(shown);
-			expect(parts).toHaveLength(2);
-			expect(parts[0]).toContain("held-task");
-			expect(parts[1]).toContain("full-task");
 		});
 	});
 

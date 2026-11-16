@@ -10,7 +10,9 @@ describe("the parts of a project's page", () => {
 		const part = quickPart(
 			fullDocument({ workstreams: [workstream("alpha", [])] }),
 		);
-		expect(part).toMatch(/<p class="stamp">[^<]*git alone[^<]*<\/p>/i);
+		expect(part).toMatch(
+			/<p class="stamp">(?:<span[^>]*>↻<\/span>)?[^<]*git alone[^<]*<\/p>/i,
+		);
 		expect(part).not.toMatch(/<div class="notice">/);
 	});
 
@@ -25,7 +27,9 @@ describe("the parts of a project's page", () => {
 				},
 			}),
 		);
-		expect(part).toMatch(/<p class="stamp">[^<]*git alone/i);
+		expect(part).toMatch(
+			/<p class="stamp">(?:<span[^>]*>↻<\/span>)?[^<]*git alone/i,
+		);
 		expect(part).toMatch(
 			/<div class="notice"><span>The trunk may be stale: the fetch failed\.<\/span><\/div>/,
 		);
@@ -33,7 +37,9 @@ describe("the parts of a project's page", () => {
 
 	it("gives every stamp one fixed height, so no part's document starts lower", () => {
 		expect(STYLE).toMatch(/\.stamp \{[^}]*min-height: 36px/);
-		expect(STYLE).toMatch(/position: absolute;[^}]*[^-]height: 36px/);
+		expect(STYLE).toMatch(
+			/\.stamp \{[^}]*position: fixed[^}]*min-height: 36px/,
+		);
 	});
 });
 

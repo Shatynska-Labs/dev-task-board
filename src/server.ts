@@ -67,10 +67,14 @@ function projectPage(
 		const full = reads.refresh(workspace, project).then(() => {
 			fullEnded = true;
 		});
-		const quick = reads.quick(workspace, project);
-		const document = await Promise.race([quick, full.then(() => undefined)]);
-		if (document !== undefined && !fullEnded) {
-			response.write(quickPart(document, starred()));
+		// Where a document is held, it stays until the full read ends, and no quick
+		// read starts: it would only show a less complete picture before the last.
+		if (held?.state !== "read") {
+			const quick = reads.quick(workspace, project);
+			const document = await Promise.race([quick, full.then(() => undefined)]);
+			if (document !== undefined && !fullEnded) {
+				response.write(quickPart(document, starred()));
+			}
 		}
 		await full;
 		response.end(projectPageEnd(reads.get(workspace, project), starred()));
