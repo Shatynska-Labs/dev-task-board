@@ -1,13 +1,15 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
+	lstat,
 	mkdir,
 	readFile,
+	readlink,
 	realpath,
 	rename,
 	rm,
 	writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parse, stringify, TomlError } from "smol-toml";
 import {
 	parseSettings,
@@ -73,7 +75,11 @@ function applied(
 	if (!isTable(workspaces)) {
 		throw new SaveRefused("workspaces is not a table");
 	}
-	const held = workspaces[action.workspace];
+	// Own keys only, so a name such as constructor is never found on the
+	// object's prototype.
+	const held = Object.hasOwn(workspaces, action.workspace)
+		? workspaces[action.workspace]
+		: undefined;
 	if (action.kind === "add_workspace") {
 		if (action.workspace === "") {
 			throw new SaveRefused("a workspace needs a name");
@@ -139,13 +145,21 @@ async function targetOf(path: string): Promise<string> {
 	try {
 		return await realpath(path);
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-			return path;
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+			throw new SaveFailed(
+				`${path} could not be read: ${(error as Error).message}`,
+			);
 		}
-		throw new SaveFailed(
-			`${path} could not be read: ${(error as Error).message}`,
-		);
 	}
+	// Missing, or a link to a file not written yet, which the save creates.
+	try {
+		if ((await lstat(path)).isSymbolicLink()) {
+			return resolve(dirname(path), await readlink(path));
+		}
+	} catch {
+		// Not there at all: the save creates it.
+	}
+	return path;
 }
 
 async function textOf(path: string): Promise<string> {

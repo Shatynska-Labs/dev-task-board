@@ -205,6 +205,8 @@ function outcomeFromOutput(stdout: string): Outcome {
 export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 	let workspaces = initial;
 	const fullStops = new Map<string, () => Promise<void>>();
+	// Reads a save cancelled: their outcome is not held, and no tool starts.
+	const cancelled = new Set<Promise<void>>();
 	const states = new Map<string, ProjectState>();
 	const running = new Map<number, () => Promise<void>>();
 	const inFlight = new Map<string, Promise<void>>();
@@ -343,6 +345,7 @@ export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 		path: string,
 		account: string,
 		onStop: (stop: () => Promise<void>) => void,
+		isCancelled: () => boolean,
 	): Promise<Outcome> {
 		const started = Date.now();
 		const lookup = await runGroup(
@@ -366,7 +369,7 @@ export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 					: `taking the token for GitHub account ${account}: `;
 			return { ...failure, reason: named + failure.reason };
 		}
-		if (stopped) {
+		if (stopped || isCancelled()) {
 			return { state: "failed", reason: "the board stopped" };
 		}
 		if (token !== "") {
@@ -388,12 +391,18 @@ export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 		workspace: Workspace,
 		project: Project,
 		onStop: (stop: () => Promise<void>) => void,
+		isCancelled: () => boolean,
 	): Promise<Outcome> {
 		return workspace.githubAccount === undefined
 			? outcomeOfTool(
 					await runTool(project.path, undefined, options.limitMs, onStop),
 				)
-			: readAsAccount(project.path, workspace.githubAccount, onStop);
+			: readAsAccount(
+					project.path,
+					workspace.githubAccount,
+					onStop,
+					isCancelled,
+				);
 	}
 
 	// One read per project: whoever asks during a read waits for that read.
@@ -404,13 +413,21 @@ export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 		if (current !== undefined) {
 			return current;
 		}
-		const read = readProject(workspace, project, (stop) => {
-			fullStops.set(flight, stop);
-		}).then((outcome) => {
-			inFlight.delete(flight);
-			fullStops.delete(flight);
-			// A project a save removed meanwhile is not held.
-			if (isNamed(workspace.name, project)) {
+		const read: Promise<void> = readProject(
+			workspace,
+			project,
+			(stop) => {
+				fullStops.set(flight, stop);
+			},
+			() => cancelled.has(read),
+		).then((outcome) => {
+			if (inFlight.get(flight) === read) {
+				inFlight.delete(flight);
+				fullStops.delete(flight);
+			}
+			// A read a save cancelled, or of a project it removed, is not held.
+			const wasCancelled = cancelled.delete(read);
+			if (!wasCancelled && isNamed(workspace.name, project)) {
 				states.set(
 					id,
 					settle(states.get(id), outcome, new Date().toISOString()),
@@ -513,7 +530,16 @@ export function createReads(initial: Workspace[], options: ReadOptions): Reads {
 				for (const project of workspace.projects) {
 					if (!isNamed(workspace.name, project)) {
 						states.delete(key(workspace.name, project.name));
-						void fullStops.get(flightKey(workspace.name, project))?.();
+						// Cancelled and forgotten, so a project added back starts a
+						// read of its own rather than joining this one.
+						const flight = flightKey(workspace.name, project);
+						const read = inFlight.get(flight);
+						if (read !== undefined) {
+							cancelled.add(read);
+							inFlight.delete(flight);
+						}
+						void fullStops.get(flight)?.();
+						fullStops.delete(flight);
 					}
 				}
 			}
