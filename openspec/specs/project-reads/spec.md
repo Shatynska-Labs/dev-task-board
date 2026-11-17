@@ -8,7 +8,7 @@ Reading each project with the carried tool, with a reason for every failed read 
 
 ### Requirement: Each project is read at start and when requested
 
-The command SHALL read each project after the server starts, one project at a time per workspace, by running the carried tool through `bash` with `--json` and the project's path. A request for a project's page SHALL read that project, and a request for a workspace's overview SHALL read nothing. A project SHALL have one read at a time: a request for a project being read SHALL wait for that read and start none. Between requests, once the pass at start has ended, nothing SHALL be read. A project SHALL be one of: being read, holding a document, or failed with a reason, and it SHALL be failed only where it holds no document. A project read before SHALL keep its state until its next read finishes, and SHALL NOT return to being read.
+The command SHALL read each project after the server starts, one project at a time per workspace, by running the carried tool through `bash` with `--json` and the project's path. A request for a project's page SHALL read that project, and a request for a workspace's overview SHALL read nothing. A project SHALL have one read at a time: a request for a project being read SHALL wait for that read and start none. Between requests, once the pass at start has ended, nothing SHALL be read but the projects a save adds, as "Reads follow saved settings" states. A project SHALL be one of: being read, holding a document, or failed with a reason, and it SHALL be failed only where it holds no document. A project read before SHALL keep its state until its next read finishes, and SHALL NOT return to being read.
 
 #### Scenario: A readable project
 
@@ -277,3 +277,29 @@ A request for a project's page that finds the project holding no read document S
 - **GIVEN** a project holding a document, with a stub tool that logs its environment
 - **WHEN** its page is requested
 - **THEN** the tool runs once, as the full read
+
+### Requirement: Reads follow saved settings
+
+After the settings page saves a change, the board's workspaces SHALL be the saved ones, with no restart. A project still named in the same workspace with the same path SHALL keep what it holds; a project added SHALL be read as the pass at start reads a project; a project removed SHALL no longer be held, any read of it SHALL be stopped, and a read of it that ends later SHALL NOT be held.
+
+#### Scenario: A project added
+
+- **GIVEN** a running board whose workspace `work` holds project `one`, read
+- **WHEN** project `two` is added to `work` from the settings page
+- **THEN** `one` holds what it held, and `two` is read without a restart and its page shows its tasks
+
+#### Scenario: A project removed
+
+- **GIVEN** a running board whose workspace `work` holds projects `one` and `two`, with a read of `two` that has not ended
+- **WHEN** `two` is removed from `work` from the settings page
+- **THEN** `/work/two` answers 404, the read is stopped, and `one` holds what it held
+
+### Requirement: A save meets the pass at start
+
+The pass at start SHALL read no project that a save has removed before its turn, and the projects a save adds SHALL be read one at a time per workspace, as at start.
+
+#### Scenario: Removed during the pass at start
+
+- **GIVEN** a pass at start waiting on the read of `one`, with `two` after it in workspace `work`
+- **WHEN** `two` is removed from `work` from the settings page
+- **THEN** `two` is never read
